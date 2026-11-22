@@ -19,6 +19,7 @@ STATIC_FILES = {
     "/markdown.js": ("markdown.js", "text/javascript; charset=utf-8"),
     "/assets/ai-workflow.jpg": ("assets/ai-workflow.jpg", "image/jpeg"),
     "/assets/first-release.jpg": ("assets/first-release.jpg", "image/jpeg"),
+    "/assets/itfetter-icon.svg": ("assets/itfetter-icon.svg", "image/svg+xml"),
 }
 SESSION_COOKIE = "itfetter_session"
 SESSIONS = set()
@@ -83,10 +84,11 @@ class BlogHandler(BaseHTTPRequestHandler):
             }} catch {{}}
           </script>
           <link rel="stylesheet" href="/styles.css">
+          <link rel="icon" type="image/svg+xml" href="/assets/itfetter-icon.svg">
         </head>
         <body>
           <header class="header"><div class="wrap admin-header">
-            <a class="brand" href="/"><span class="mark" aria-hidden="true">&gt;_</span>itfetter</a>
+            <a class="brand" href="/"><img class="mark" src="/assets/itfetter-icon.svg" alt="" width="31" height="31">itfetter</a>
             {action}
           </div></header>
           <main class="wrap">{body}</main>

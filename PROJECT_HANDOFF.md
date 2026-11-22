@@ -22,6 +22,7 @@
 | UI 与自动保存版 · `76aa621` | `admin.js`、`index.html`、`styles.css`、`content_store.py` 和项目文档 | 文章停笔后自动保存草稿，标题下反馈结果。统一首页、归档、正文和管理列表的留白与层级，增加评论数和目录入口，重排留言表单及回复。 |
 | 样例内容版 · `1853c0b` | `assets/`、`content.js`、`index.html`、`styles.css`、`server.py` 和项目文档 | 为样稿增加两张原创封面和三篇文章的八条标记为示例的评论，包含楼中回复。已有的本地预览按评论 ID 补入示例。 |
 | 关于页与阅读导航 | `index.html`、`styles.css` 和项目文档 | 关于页展示作者介绍、GitHub 与推荐阅读。文章顶部的「返回」恢复来源页面及搜索，直接打开文章时回到归档。 |
+| 站点标志 | `assets/itfetter-icon.svg`、`index.html`、`server.py`、`styles.css` 和项目文档 | 采用蓝底白字的 `i>`，前台与后台共用同一标签图标和页眉标志。 |
 
 ## 预览与部署
 

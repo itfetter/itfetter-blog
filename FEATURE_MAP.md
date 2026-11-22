@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | 首页与主题入口 | `home()`、`topics`、`posts`、`notes`、`projects`，样式 `.hero`、`.feature`、`.home-grid` | 置顶链接、最近列表、主题文章数、窄屏重排 |
 | 样稿封面与评论 | `index.html` 的 `sampleCovers`、`cover()`，`assets/`，`server.py` 的静态文件映射，`content.js` 的 `comments` | 首页置顶与正文封面、示例标签、归档计数和楼中回复 |
+| 站点标志 | `assets/itfetter-icon.svg`、`index.html`、`server.py`、`styles.css` 的 `.mark` | 前台和后台的标签图标及页眉标志 |
 | 路由、导航与标题 | `render()`、`navigateToArticle()`、`hashchange`、`.nav` | 文章返回进入时的页面与筛选、恢复搜索、目录跳转后仍能返回入口、直达链接回退归档 |
 | 关于本站 | `about()`、`settings`、`.about-page`、`.about-links` | 作者介绍、后台 Markdown、GitHub 链接、推荐文章、移动端单列 |
 | 归档和筛选 | `archive()`、`row()`、`.filter-bar`、`.pill` | 年份分组、结果计数、重新筛选后的焦点 |
