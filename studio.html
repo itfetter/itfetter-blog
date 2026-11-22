@@ -1,68 +1,26 @@
-  <div class="page-intro">
-    <h1>写作台</h1>
-    <p>草稿保存在当前浏览器，写完可以导出为 Markdown 文件。</p>
-  </div>
-  <div class="studio-grid">
-    <div class="studio-pane">
-      <label for="draft">Markdown 草稿</label>
-      <textarea id="draft" placeholder="## 写下要解决的问题" aria-describedby="draft-help"></textarea>
-      <p class="subtle" id="draft-help">预览支持标题、段落、列表和围栏代码块。</p>
-    </div>
-    <section class="studio-pane studio-preview" aria-labelledby="draft-view-title">
-      <h2 id="draft-view-title">实时预览</h2>
-      <div id="draft-preview"></div>
-    </section>
-  </div>
-  <div class="studio-actions">
-    <button class="primary" id="export-draft" type="button">导出 Markdown</button>
-    <span class="subtle" id="draft-status" role="status"></span>
-  </div>
-  <script>
-    const escapeHtml = value => value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
-
-    function markdownPreview(markdown) {
-      return markdown.trim().split(/(^```[^\n]*\n[\s\S]*?\n```[ \t]*$)/m).map((part, index) => {
-        if (index % 2) return `<pre><code>${escapeHtml(part.slice(part.indexOf('\n') + 1, part.lastIndexOf('\n')))}</code></pre>`;
-        return escapeHtml(part).replace(/^(#{1,3} .+)$/gm,'\n$1\n').trim().split(/\n\s*\n/).filter(Boolean).map(block => {
-          const heading = block.match(/^(#{1,3}) (.+)$/);
-          if (heading) {
-            const level = heading[1].length + 2;
-            return `<h${level}>${heading[2]}</h${level}>`;
-          }
-          const lines = block.split('\n');
-          if (lines.every(line => /^[-*] /.test(line))) return `<ul>${lines.map(line => `<li>${line.slice(2)}</li>`).join('')}</ul>`;
-          return `<p>${block.replaceAll('\n','<br>')}</p>`;
-        }).join('');
-      }).join('');
-    }
-
-    function setupStudio() {
-      const draft = document.querySelector('#draft');
-      const preview = document.querySelector('#draft-preview');
-      const status = document.querySelector('#draft-status');
-      const download = document.querySelector('#export-draft');
-      try { draft.value = localStorage.getItem('itfetter-draft') || ''; } catch {}
-      function refreshPreview() {
-        preview.innerHTML = markdownPreview(draft.value) || '<p class="subtle">开始写作后，这里会显示预览。</p>';
-        download.disabled = !draft.value.trim();
-      }
-      draft.addEventListener('input', () => {
-        try {
-          localStorage.setItem('itfetter-draft', draft.value);
-          status.textContent = '草稿已保存到当前浏览器';
-        } catch { status.textContent = '浏览器未能保存草稿，可以先导出 Markdown。'; }
-        refreshPreview();
-      });
-      download.addEventListener('click', () => {
-        const url = URL.createObjectURL(new Blob([draft.value], {type:'text/markdown;charset=utf-8'}));
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'itfetter-draft.md';
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      });
-      refreshPreview();
-    }
-
-    setupStudio();
-  </script>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <h1>博客管理</h1>
+    <nav class="admin-nav" aria-label="管理后台">
+      <button type="button" data-view="overview" aria-current="page">总览</button>
+      <button type="button" data-view="posts">文章</button>
+      <button type="button" data-view="notes">笔记</button>
+      <button type="button" data-view="projects">项目</button>
+      <button type="button" data-view="settings">站点设置</button>
+    </nav>
+  </aside>
+  <section class="admin-workspace" aria-label="管理内容">
+    <div id="admin-page"><p class="subtle">正在加载站点内容…</p></div>
+    <p id="admin-status" class="admin-feedback" role="status"></p>
+  </section>
+</div>
+<dialog id="admin-delete" aria-labelledby="delete-heading">
+  <h2 id="delete-heading">删除这条内容？</h2>
+  <p></p>
+  <form method="dialog" class="actions">
+    <button value="cancel" class="secondary" autofocus>取消</button>
+    <button value="delete" class="danger-button">确认删除</button>
+  </form>
+</dialog>
+<script src="/markdown.js"></script>
+<script src="/admin/editor.js"></script>

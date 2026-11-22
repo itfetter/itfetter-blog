@@ -10,8 +10,10 @@
 | --- | --- |
 | `index.html` | 公开页面骨架、样稿与条目、Hash 路由、搜索和阅读 |
 | `styles.css` | 公开博客、登录和写作台的共享样式 |
-| `server.py` | 本地 HTTP 预览、`/admin` 登录和会话校验 |
-| `studio.html` | 登录后才由服务端返回的写作台模板与编辑逻辑 |
+| `server.py` | 本地 HTTP 预览、`/admin` 登录、会话和内容接口 |
+| `studio.html`、`admin.js` | 登录后返回的管理后台、内容表单、文档块编辑 |
+| `content.js`、`content_store.py` | 初始内容和静态导出格式、本地内容校验与读写 |
+| `markdown.js` | 前台阅读、后台块编辑与预览共用的 Markdown 处理 |
 | `start-preview.bat` | 用已有 Python 在 Windows 启动仅本机可访问的预览 |
 | `FEATURE_MAP.md` | 按功能定位代码、依赖和检查路径 |
 | `PROJECT_HANDOFF.md` | 每轮变更、实测状态、部署和后续工作 |
@@ -21,15 +23,16 @@
 
 ## 核心数据模型
 
-- `posts` 包含稳定的 `id`、`topic`、`date`、`title`、`summary` 和 `sections`。小节为 `[标题, 段落, 可选代码]`。主题键由 `topics` 定义。
-- `notes` 包含 `kind`、`date`、`title`、`text`、`detail`。`projects` 包含 `kind`、`title`、`text` 和链接到文章 `id` 的 `post`。
-- 本机浏览器使用 `itfetter-theme` 保存主题偏好、`itfetter-draft` 保存当前 Markdown 草稿。发布时间用 `YYYY-MM-DD`，文章标识采用英文小写 kebab-case。
+- `posts` 包含稳定的 `id`、`topic`、`date`、`title`、`summary`、Markdown `body` 和 `status`。主题键由 `topics` 定义。
+- `notes` 包含分类、日期、标题、摘要和正文。`projects` 包含分类、标题、说明、网址和关联文章 `id`。所有内容都有 `id` 和发布状态，取值 `draft` 或 `published`。
+- `settings` 保存站名、作者、首页介绍、关于页、GitHub 链接和置顶文章。`blog-data.json` 保存实际内容，`content.js` 是可跟踪的初始内容和公开导出格式。
+- 浏览器使用 `itfetter-theme` 保存主题偏好。旧版 `itfetter-draft` 可以从新建文章页面带入。发布时间使用 `YYYY-MM-DD`。
 
 ## 修改边界、API 与数据库
 
 可按任务编辑根目录页面、脚本和文档。调整路由、文章标识或本地存储键前，先检查已有链接和草稿恢复流程。谨慎修改预览监听范围以及参考资料。避免重排与需求无关的代码。
 
-`GET /admin` 根据会话返回登录页或写作台，`POST /admin/login` 验证本地账号，`POST /admin/logout` 注销会话。会话保存在服务进程中，重启后需要重新登录。后台模板只由受保护路由返回。当前没有数据库，草稿继续保存在浏览器。新增 API 时明确请求、响应、错误与权限，并在入口校验一次。
+`GET /admin` 根据会话返回登录页或管理后台，`POST /admin/login` 验证账号，`POST /admin/logout` 注销会话。`GET /admin/content` 读取管理数据，`POST /admin/content` 保存一条内容或更新设置。公开 `/content.js` 只返回已发布内容。会话在服务进程中，内容写入本地文件。新增 API 时明确请求、响应、错误与权限，并在入口校验一次。
 
 ## 前端规则
 
@@ -43,6 +46,6 @@
 1. 修改前读本文件、交接和功能地图，再查涉及的真实代码。明确目标页面、影响范围及现有数据。
 2. 用已有 Python 启动 `127.0.0.1:8081`，用浏览器检查受影响的入口、键盘路径和窄屏。编辑脚本后用已有 Node.js 做语法检查。当前没有自动测试套件，测试真实实现。
 3. 修改后更新功能地图或交接中受影响的事实。写清已执行的检查和仍待验证的项目。提交前检查仅包括授权的项目文件。
-4. 静态部署只发布 `index.html` 和 `styles.css`，确认 Hash 链接可以直接打开。保持本地后台仅监听 `127.0.0.1`。当前对外部署状态以交接记录为准。
+4. 静态部署发布 `index.html`、`styles.css`、`markdown.js` 和后台导出的 `content.js`。保持本地后台仅监听 `127.0.0.1`，实际内容文件 `blog-data.json` 留在本机。当前对外部署状态以交接记录为准。
 
 本机只使用已安装的工具。确需新增依赖、环境或部署权限时，先说明用途和影响，按用户的授权范围执行。

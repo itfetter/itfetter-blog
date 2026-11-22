@@ -1,6 +1,6 @@
 # 功能地图
 
-公开页面在 [index.html](index.html)，共享样式在 [styles.css](styles.css)，本地后台在 [server.py](server.py) 和 [studio.html](studio.html)。当前没有数据库或自动化测试文件。
+公开页面在 [index.html](index.html)，共享样式在 [styles.css](styles.css)，本地后台在 [server.py](server.py)、[studio.html](studio.html) 和 [admin.js](admin.js)。内容写入本地 `blog-data.json`，初始内容在 [content.js](content.js)。
 
 | 功能 | 源码定位 | 同步检查 |
 | --- | --- | --- |
@@ -11,8 +11,10 @@
 | 搜索弹层 | `#search`、`search()`、`openSearch()`、`openResult()`、`#query` 键盘处理 | `/` 或 `Ctrl/Cmd+K`、正文关键词、无结果恢复、方向键、Enter 与 Esc |
 | 笔记和项目 | `indexCards()`、`notes`、`projects` | 笔记详情展开，项目跳转的文章 `id` 仍存在 |
 | 后台登录 | `server.py` 的 `GET /admin`、`POST /admin/login`、`POST /admin/logout` | 未登录、错误密码、有效会话、退出、直接请求模板 |
-| 本地写作台 | `studio.html` 的 `setupStudio()`、`markdownPreview()`、`#draft`、`#export-draft` | 实时渲染、刷新读回草稿、空稿导出禁用、导出 Markdown 原文 |
+| 内容管理 | `admin.js` 的 `contentList()`、`openEditor()`，`/admin/content`、`content_store.py` 的 `update_content()` | 搜索和状态筛选、新建编辑、发布撤回、删除确认、前台同步 |
+| 文档编辑 | `admin.js` 的 `articleEditor()`、`markdown.js` | `/` 块菜单、调整块类型或顺序、Markdown 源码与预览往返、导出原文、旧草稿带入 |
+| 站点设置 | `admin.js` 的 `settingsForm()`、`content_store.py` 的 `public_script()`、`index.html` 的 `settings` | 首页、页脚和关于页同步，置顶关联，静态导出排除草稿 |
 | 浅色和深色 | `:root`、`[data-theme]`、`updateThemeButton()`、`itfetter-theme` | 系统默认主题、手动切换、刷新恢复、对比度 |
 | 本地预览 | [start-preview.bat](start-preview.bat) | 根目录 `index.html` 返回 HTTP 200，端口只在本机监听 |
 
-公开路由格式为 `#home`、`#archive[/主题]`、`#post/文章ID[/小节号]`、`#notes`、`#projects`、`#about`。写作台通过本机 `/admin` 登录进入。搜索读取文章数组，主题与草稿均按浏览器和站点地址保存。
+公开路由格式为 `#home`、`#archive[/主题]`、`#post/文章ID[/小节号]`、`#notes`、`#projects`、`#about`。管理后台通过本机 `/admin` 登录进入。搜索只读取已发布的文章。主题偏好按浏览器和站点地址保存，后台草稿保存在项目目录。

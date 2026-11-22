@@ -1,0 +1,108 @@
+import json
+import secrets
+from datetime import date
+from pathlib import Path
+from urllib.parse import urlsplit
+
+
+ROOT = Path(__file__).resolve().parent
+SEED = ROOT / "content.js"
+DATA = ROOT / "blog-data.json"
+COLLECTIONS = ("posts", "notes", "projects")
+
+
+def read_content():
+    if DATA.exists():
+        return json.loads(DATA.read_text(encoding="utf-8"))
+    return json.loads(SEED.read_text(encoding="utf-8").removeprefix("window.blogContent = ").strip().removesuffix(";"))
+
+
+def public_script(data):
+    public = {"topics": data["topics"], "settings": data["settings"]}
+    for collection in COLLECTIONS:
+        public[collection] = [item for item in data[collection] if item["status"] == "published"]
+    return "window.blogContent = " + json.dumps(public, ensure_ascii=False) + ";\n"
+
+
+def text_fields(values, limits, optional=()):
+    fields = {}
+    for field, limit in limits.items():
+        value = values.get(field, "")
+        if not isinstance(value, str) or len(value) > limit or (field not in optional and not value.strip()):
+            raise ValueError("请填写必填项，并检查内容长度。")
+        fields[field] = value.strip()
+    return fields
+
+
+def validate_url(value):
+    if value:
+        url = urlsplit(value)
+        if url.scheme not in ("http", "https") or not url.hostname:
+            raise ValueError("链接必须是有效的 HTTP 或 HTTPS 地址。")
+
+
+def update_content(data, change):
+    if not isinstance(change, dict):
+        raise ValueError("提交内容格式有误。")
+    collection = change.get("collection")
+    item_id = change.get("id")
+    values = change.get("item")
+    if collection == "settings":
+        if not isinstance(values, dict):
+            raise ValueError("站点设置格式有误。")
+        settings = text_fields(values, {"title": 70, "author": 50, "description": 350, "about": 8000, "github": 300, "featured": 100}, ("github", "featured"))
+        validate_url(settings["github"])
+        if settings["featured"] and not any(item["id"] == settings["featured"] and item["status"] == "published" for item in data["posts"]):
+            raise ValueError("首页置顶只能选择已发布的文章。")
+        data["settings"] = settings
+        return
+
+    if collection not in COLLECTIONS or not isinstance(item_id, str):
+        raise ValueError("未找到要管理的内容类型。")
+    items = data[collection]
+    current = next((item for item in items if item["id"] == item_id), None)
+    if item_id and current is None:
+        raise ValueError("该内容不存在，请刷新后台后重试。")
+    if values is None and current is not None:
+        items.remove(current)
+        if collection == "posts":
+            for project in data["projects"]:
+                if project.get("post") == item_id:
+                    project["post"] = ""
+    elif isinstance(values, dict):
+        common = {"title": 150, "status": 12}
+        if collection == "posts":
+            fields = text_fields(values, {**common, "topic": 20, "date": 10, "summary": 350, "body": 180000}, ("summary", "body"))
+            if fields["topic"] not in data["topics"]:
+                raise ValueError("请选择文章主题。")
+            if fields["status"] == "published" and not (fields["summary"] and fields["body"]):
+                raise ValueError("发布文章前请填写摘要和正文。")
+            fields["sample"] = False
+        elif collection == "notes":
+            fields = text_fields(values, {**common, "kind": 40, "date": 10, "text": 350, "detail": 8000}, ("detail",))
+        else:
+            fields = text_fields(values, {**common, "kind": 40, "text": 350, "post": 100, "url": 300}, ("post", "url"))
+            validate_url(fields["url"])
+            if fields["post"] and not any(post["id"] == fields["post"] for post in data["posts"]):
+                raise ValueError("请选择现有文章作为项目关联。")
+        if fields["status"] not in ("published", "draft"):
+            raise ValueError("请选择草稿或已发布状态。")
+        if "date" in fields:
+            fields["date"] = date.fromisoformat(fields["date"]).isoformat()
+        fields["id"] = item_id or secrets.token_hex(6)
+        if current is None:
+            items.append(fields)
+        else:
+            items[items.index(current)] = fields
+    else:
+        raise ValueError("提交内容格式有误。")
+
+    if collection == "posts" and data["settings"]["featured"] == item_id:
+        if values is None or fields["status"] != "published":
+            data["settings"]["featured"] = ""
+
+
+def write_content(data):
+    pending = DATA.with_suffix(".tmp")
+    pending.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    pending.replace(DATA)

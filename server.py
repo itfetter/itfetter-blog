@@ -1,10 +1,14 @@
 import argparse
+import json
 import secrets
 from http import HTTPStatus
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Lock
 from urllib.parse import parse_qs, urlsplit
+
+from content_store import public_script, read_content, update_content, write_content
 
 
 ROOT = Path(__file__).resolve().parent
@@ -12,9 +16,11 @@ STATIC_FILES = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
+    "/markdown.js": ("markdown.js", "text/javascript; charset=utf-8"),
 }
 SESSION_COOKIE = "itfetter_session"
 SESSIONS = set()
+CONTENT_LOCK = Lock()
 # These are the requested defaults for the loopback-only preview.
 ADMIN_USERNAME = "amdin"
 ADMIN_PASSWORD = "123456"
@@ -42,8 +48,8 @@ class BlogHandler(BaseHTTPRequestHandler):
 
     def render_admin(self, *, signed_in=False, error=False):
         if signed_in:
-            title = "写作台"
-            action = '<form method="post" action="/admin/logout"><button class="secondary" type="submit">退出登录</button></form>'
+            title = "博客管理"
+            action = '<div class="admin-header-actions"><a class="secondary" href="/" target="_blank" rel="noopener">查看博客</a><form method="post" action="/admin/logout"><button class="secondary" type="submit">退出登录</button></form></div>'
             body = (ROOT / "studio.html").read_text(encoding="utf-8")
         else:
             title = "登录写作台"
@@ -51,7 +57,7 @@ class BlogHandler(BaseHTTPRequestHandler):
             feedback = '<p class="form-error" role="alert">账号或密码错误，请重试。</p>' if error else ""
             body = f'''<section class="admin-login" aria-labelledby="login-title">
               <h1 id="login-title">登录写作台</h1>
-              <p class="subtle">登录后即可编辑和导出本地草稿。</p>
+              <p class="subtle">登录后管理文章、笔记、项目和站点设置。</p>
               <form class="admin-form" method="post" action="/admin/login">
                 {feedback}
                 <label for="username">账号</label>
@@ -95,11 +101,27 @@ class BlogHandler(BaseHTTPRequestHandler):
             self.send_header("Set-Cookie", cookie)
         self.end_headers()
 
+    def send_json(self, status, data):
+        self.send_content(status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8", private=True)
+
     def do_GET(self):
         path = urlsplit(self.path).path
         if path in STATIC_FILES:
             filename, content_type = STATIC_FILES[path]
             self.send_content(HTTPStatus.OK, (ROOT / filename).read_bytes(), content_type)
+        elif path == "/content.js":
+            with CONTENT_LOCK:
+                content = public_script(read_content())
+            self.send_content(HTTPStatus.OK, content.encode("utf-8"), "text/javascript; charset=utf-8", private=True)
+        elif path in ("/admin/content", "/admin/editor.js"):
+            if self.session_token() not in SESSIONS:
+                self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "请重新登录后台。"})
+            elif path == "/admin/content":
+                with CONTENT_LOCK:
+                    data = read_content()
+                self.send_json(HTTPStatus.OK, data)
+            else:
+                self.send_content(HTTPStatus.OK, (ROOT / "admin.js").read_bytes(), "text/javascript; charset=utf-8", private=True)
         elif path == "/admin":
             self.render_admin(signed_in=self.session_token() in SESSIONS)
         elif path == "/admin/":
@@ -111,6 +133,9 @@ class BlogHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path == "/admin/content":
+            self.save_admin_content()
+            return
         if path == "/admin/logout":
             SESSIONS.discard(self.session_token())
             self.redirect_to_admin(f"{SESSION_COOKIE}=; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=0")
@@ -132,6 +157,28 @@ class BlogHandler(BaseHTTPRequestHandler):
         token = secrets.token_urlsafe(32)
         SESSIONS.add(token)
         self.redirect_to_admin(f"{SESSION_COOKIE}={token}; Path=/admin; HttpOnly; SameSite=Strict")
+
+    def save_admin_content(self):
+        if self.session_token() not in SESSIONS:
+            self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "请重新登录后台。"})
+            return
+        length = self.headers.get("Content-Length", "")
+        if self.headers.get_content_type() != "application/json" or not length.isdecimal() or not 0 < int(length) <= 750000:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "提交内容格式有误或过长。"})
+            return
+        try:
+            change = json.loads(self.rfile.read(int(length)))
+            with CONTENT_LOCK:
+                data = read_content()
+                update_content(data, change)
+                write_content(data)
+        except (ValueError, UnicodeError) as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+            return
+        except OSError:
+            self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "文件未能保存，请检查项目目录是否可写。"})
+            return
+        self.send_json(HTTPStatus.OK, data)
 
 
 if __name__ == "__main__":

@@ -18,7 +18,7 @@
   <div class="progress" id="progress" aria-hidden="true"></div>
   <header class="header">
     <div class="wrap header-inner">
-      <a class="brand" href="#home"><span class="mark" aria-hidden="true">&gt;_</span>itfetter</a>
+      <a class="brand" href="#home"><span class="mark" aria-hidden="true">&gt;_</span><span id="brand-name">itfetter</span></a>
       <nav class="nav" aria-label="主导航"><a href="#home">首页</a><a href="#archive">文章</a><a href="#notes">笔记</a><a href="#projects">项目</a><a href="#about">关于</a></nav>
       <div class="tools">
         <button class="icon search-button" id="open-search" aria-label="搜索文章"><span class="lens" aria-hidden="true"></span><span>搜索</span><kbd aria-hidden="true">Ctrl K</kbd></button>
@@ -27,7 +27,7 @@
     </div>
   </header>
   <main id="main" class="wrap" tabindex="-1"><noscript>请启用 JavaScript 浏览博客原型。</noscript></main>
-  <footer><div class="wrap footer-inner"><span>© 2026 itfetter · 开发手记</span><div class="footer-links"><a href="#about">关于本站</a><a href="https://github.com/itfetter">GitHub</a></div></div></footer>
+  <footer><div class="wrap footer-inner"><span id="footer-brand"></span><div class="footer-links"><a href="#about">关于本站</a><a id="github-link" hidden>GitHub</a></div></div></footer>
   <dialog class="search-dialog" id="search" aria-labelledby="search-label">
     <div class="search-heading"><h2 id="search-label">搜索文章</h2><form method="dialog"><button class="icon" aria-label="关闭搜索">×</button></form></div>
     <div class="search-form"><span class="lens" aria-hidden="true"></span><input type="search" id="query" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="results" aria-label="搜索关键词" placeholder="输入标题、主题或关键词" autocomplete="off" autofocus></div>
@@ -35,35 +35,21 @@
     <div class="search-results" id="results" role="listbox" aria-label="匹配文章"></div>
     <div class="search-help"><span><kbd>↑</kbd> <kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 打开</span><span><kbd>Esc</kbd> 关闭</span></div>
   </dialog>
+  <script src="./content.js"></script>
+  <script src="./markdown.js"></script>
   <script>
-    const topics = {ai: 'AI 体验', dev: '个人开发', note: '随手记'};
-    const posts = [
-      {id:'working-with-coding-agents', topic:'ai', date:'2026-11-18', title:'把 AI 编程接进日常之后', summary:'从理解项目到审查提交，一套可以反复用的协作流程。', sections:[
-        ['先约定交付长什么样','同样是「修一下列表」，可能指移动端溢出，也可能指排序结果不对。发任务前，写下从哪里进入、操作到哪一步、预期看到什么。验收描述越具体，后面越容易判断改动是否跑偏。'],
-        ['把理解和修改拆开','先让工具定位入口和已有的验证命令，再动手改一件事。读提交时从用户入口开始，沿着数据走到最终状态，确认每一步仍符合现有行为。'],
-        ['留一份能接力的记录','结束时记下这次跑过的命令、手动试过的步骤，以及仍需确认的地方。隔几天回看时，这几行比整段对话更容易用。','已验证：空列表、长标题、移动端折行\n待确认：生产数据下的分页表现'],
-        ['用验收表比较两次尝试','下面用一个文章列表展示如何逐项核对结果。每项都写成能重做的操作，方便检查提示词的变化到底解决了什么。'] ]},
-      {id:'small-tool-first-release', topic:'dev', date:'2026-11-12', title:'一个小工具的第一个可用版本', summary:'先做通最常用的一条路径，再决定哪些想法值得继续做。', sections:[
-        ['从手工做过的任务开始','拿三条真实记录跑一遍原来的流程。先记下最耗时的那一步，例如每周重复把一组链接整理成可发给同事的清单。它就是首版要解决的问题。'],
-        ['让失败也有下一步','粘贴内容里混有空行时可以照常整理。遇到无法识别的地址，直接指出具体是哪一行，让用户修改后继续。'],
-        ['把交付条件写下来','从空白页面开始，粘贴、预览、复制，三步可以完成一次真实任务。再把这条路径交给第一次看到工具的人试一遍。']]},
-      {id:'notes-worth-keeping', topic:'note', date:'2026-11-06', title:'给试过的东西留一份笔记', summary:'记录当时想解决的问题，以及哪些尝试值得下次复用。', sections:[
-        ['把具体问题写在开头','「尝试了一个新工具」很难在下次遇到问题时搜出来。标题写成「怎么把浏览器里的片段整理成 Markdown」，以后还能用自己的话把它找回来。'],
-        ['留下结果和条件','记下用的输入、耗时，以及哪一步仍然要手工处理。短笔记也可以用这三个信息交代清楚一次实验。'],
-        ['复用时补充一行','第二次用同一方法时，把变化追加到原来的笔记。几次积累之后，就能看清哪些步骤适合做进工具。']]},
-      {id:'same-task-two-prompts',topic:'ai',date:'2026-10-29',title:'用同一个任务比较两种提示写法',summary:'从输出的可验证性和返工次数评估一次提示调整。',sections:[['固定输入','选一段能快速验收的文档，保留相同的原文和输出格式。第一种提示只给任务，第二种加上范围和验收条件。'],['看得见的比较','逐项标记输出里哪些内容能从原文核对，再记下补充指令的次数。换几个不同题材的样本，才容易看出哪些条件确实值得保留。']]},
-      {id:'bookmark-export',topic:'dev',date:'2026-10-17',title:'写一个浏览器书签整理脚本',summary:'用现成的书签导出文件验证整理规则。',sections:[['保留原始文件','先把浏览器导出的书签文件留作备份。整理脚本读取副本并输出一张清单，便于对比原有的文件夹层级。'],['检查重复和标题','同一网址可能有不同的名字，也可能被放进多个文件夹。先在预览里展示这些差异，再决定哪些条目适合合并。']]},
-      {id:'weekly-review',topic:'note',date:'2025-12-21',title:'周末项目的一次简单复盘',summary:'把下次打开仓库时最有用的三件事写下来。',sections:[['先记现在能做什么','打开项目，从使用者的视角把能做成的那件事完整走一遍。把入口、数据和关键操作写在同一处，给下一次工作留个起点。'],['给下次留一个可完成的任务','选一个两小时内能验证的改动，记录它解决的使用问题和验收步骤。下次从这里开始，会比重新规划整周容易。']]}
-    ];
-
-    const notes = [
-      {kind:'写作方法', date:'2026-11-20', title:'把 AI 实测写成能重做的记录', text:'留住任务输入、验收步骤和失败示例。换一个工具时还能复用这份记录。', detail:'先固定一份输入，再各跑一次相同任务。把人工返工拆成补上下文、改实现和补验证，记录每一步的耗时。'},
-      {kind:'开发便笺', date:'2026-11-10', title:'空状态也跑一遍真实操作', text:'用空仓库、空文件和正常输入各试一次，看看页面是否说明了下一步。', detail:'用可执行的文案替换「暂无数据」。例如「还没有书签，粘贴一组链接开始整理」。'}
-    ];
-    const projects = [
-      {kind:'项目构想', title:'浏览器书签整理器', text:'把网址清单变成一份可以检查、去重和复制的分享列表。', post:'bookmark-export'},
-      {kind:'流程样例', title:'AI 协作验收清单', text:'记录变更范围、复核步骤和未验证事项，给下一轮开发留一个清楚的起点。', post:'working-with-coding-agents'}
-    ];
+    const {topics, posts, notes, projects, settings} = window.blogContent;
+    const {escape:escapeHtml, blocks:markdownBlocks, render:renderMarkdown} = window.blogMarkdown;
+    posts.sort((a,b) => b.date.localeCompare(a.date));
+    notes.sort((a,b) => b.date.localeCompare(a.date));
+    document.querySelector('#brand-name').textContent = settings.author;
+    document.querySelector('#footer-brand').textContent = `© ${new Date().getFullYear()} ${settings.author} · ${settings.title}`;
+    document.querySelector('meta[name="description"]').content = settings.description;
+    const github = document.querySelector('#github-link');
+    if (settings.github) {
+      github.href = settings.github;
+      github.hidden = false;
+    }
 
     const main = document.querySelector('main');
     const dialog = document.querySelector('#search');
@@ -75,8 +61,7 @@
     const postLink = post => `#post/${post.id}`;
     const date = post => `<time datetime="${post.date}">${post.date.replaceAll('-', '.')}</time>`;
     const metadata = post => `<div class="meta"><span class="tag">${topics[post.topic]}</span>${date(post)}</div>`;
-    const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<div><strong>${post.title}</strong><small>${post.summary}</small></div><span class="meta tag">${topics[post.topic]}</span></a></li>`;
-    const escapeHtml = value => value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+    const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<div><strong>${escapeHtml(post.title)}</strong><small>${escapeHtml(post.summary)}</small></div><span class="meta tag">${topics[post.topic]}</span></a></li>`;
     const progress = document.querySelector('#progress');
     let currentPage = '';
     let currentPost = '';
@@ -84,20 +69,22 @@
     let selectedResult = -1;
 
     function indexCards(items) {
-      return `<div class="index-grid">${items.map(item => `<article class="index-card"><div class="meta"><span class="tag">${item.kind}</span>${item.date ? date(item) : ''}</div><h3>${item.title}</h3><p>${item.text}</p>${item.post ? `<a href="#post/${item.post}">阅读相关手记</a>` : `<details><summary>展开笔记</summary><p>${item.detail}</p></details>`}</article>`).join('')}</div>`;
+      if (!items.length) return '<p class="subtle">暂无已发布内容。</p>';
+      return `<div class="index-grid">${items.map(item => `<article class="index-card"><div class="meta"><span class="tag">${escapeHtml(item.kind)}</span>${item.date ? date(item) : ''}</div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.text)}</p><div class="actions">${item.post && posts.some(post => post.id === item.post) ? `<a href="#post/${item.post}">阅读相关手记</a>` : ''}${item.url ? `<a href="${escapeHtml(item.url)}">访问项目</a>` : ''}</div>${item.detail ? `<details><summary>展开笔记</summary><p>${escapeHtml(item.detail)}</p></details>` : ''}</article>`).join('')}</div>`;
     }
 
     function home() {
-      const lead = posts[0];
+      const lead = posts.find(post => post.id === settings.featured);
+      const latest = posts.filter(post => post !== lead).slice(0,4);
       return `<section class="hero" aria-labelledby="welcome">
-        <div><p class="hero-author">itfetter 的个人博客</p><h1 id="welcome">开发手记</h1>
-        <p class="hero-description">写个人项目从想法到做出来的过程，记录日常使用 AI 的体验，也留下一些开发时踩过的坑。</p>
+        <div><p class="hero-author">${escapeHtml(settings.author)} 的个人博客</p><h1 id="welcome">${escapeHtml(settings.title)}</h1>
+        <p class="hero-description">${escapeHtml(settings.description)}</p>
         <div class="actions"><a class="primary" href="#archive">浏览文章</a><a class="secondary" href="#about">关于我</a></div></div>
-        <a class="feature" href="${postLink(lead)}"><span class="feature-label">置顶文章</span><h2>${lead.title}</h2><p>${lead.summary}</p>${metadata(lead)}</a>
+        ${lead ? `<a class="feature" href="${postLink(lead)}"><span class="feature-label">置顶文章</span><h2>${escapeHtml(lead.title)}</h2><p>${escapeHtml(lead.summary)}</p>${metadata(lead)}</a>` : ''}
         </section>
-        <div class="home-grid"><section class="section" aria-labelledby="latest-title"><div class="section-head"><h2 id="latest-title">最近文章</h2><a href="#archive">查看归档</a></div><ul class="rows">${posts.slice(1, 5).map(row).join('')}</ul></section>
+        <div class="home-grid"><section class="section" aria-labelledby="latest-title"><div class="section-head"><h2 id="latest-title">最近文章</h2><a href="#archive">查看归档</a></div>${latest.length ? `<ul class="rows">${latest.map(row).join('')}</ul>` : '<p class="subtle">暂无最近文章。</p>'}</section>
         <aside class="home-aside" aria-label="主题和笔记"><section><h2>按主题浏览</h2><ul class="topic-list">${Object.entries(topics).map(([key, name]) => `<li><a href="#archive/${key}"><span>${name}</span><span>${posts.filter(post => post.topic === key).length}</span></a></li>`).join('')}</ul></section>
-        <section><h2>最近笔记</h2><a class="aside-link" href="#notes"><strong>${notes[0].title}</strong><small>${date(notes[0])}</small></a></section></aside></div>
+        ${notes.length ? `<section><h2>最近笔记</h2><a class="aside-link" href="#notes"><strong>${escapeHtml(notes[0].title)}</strong><small>${date(notes[0])}</small></a></section>` : ''}</aside></div>
         <section class="section projects-section"><div class="section-head"><h2>项目与实验</h2><a href="#projects">全部项目</a></div>${indexCards(projects)}</section>`;
     }
 
@@ -106,19 +93,19 @@
       const visible = posts.filter(post => !selected || post.topic === selected);
       const years = [...new Set(visible.map(post => post.date.slice(0,4)))];
       return `<div class="page-intro"><h1>文章归档</h1><p>个人开发、AI 工具体验和技术随手记。</p></div>
-        <div class="filter-bar"><nav class="filters" aria-label="按主题筛选">${[['','全部'],...Object.entries(topics)].map(([key, name]) => `<a class="pill" href="#archive${key ? '/' + key : ''}"${key === selected ? ' aria-current="true"' : ''}>${name}</a>`).join('')}</nav><span class="subtle" role="status">${visible.length} 篇样稿</span></div>
-        ${years.map(year => `<section><h2 class="year">${year}</h2><ul class="rows">${visible.filter(post => post.date.startsWith(year)).map(row).join('')}</ul></section>`).join('')}`;
+        <div class="filter-bar"><nav class="filters" aria-label="按主题筛选">${[['','全部'],...Object.entries(topics)].map(([key, name]) => `<a class="pill" href="#archive${key ? '/' + key : ''}"${key === selected ? ' aria-current="true"' : ''}>${name}</a>`).join('')}</nav><span class="subtle" role="status">${visible.length} 篇文章</span></div>
+        ${years.map(year => `<section><h2 class="year">${year}</h2><ul class="rows">${visible.filter(post => post.date.startsWith(year)).map(row).join('')}</ul></section>`).join('') || '<p class="subtle year">这个主题暂无文章。</p>'}`;
     }
 
     function article(post) {
       const related = posts.find(item => item.topic === post.topic && item !== post);
-      const links = post.sections.map(([heading], i) => `<li><a href="${postLink(post)}/${i + 1}">${heading}</a></li>`).join('');
-      return `<div class="article-grid"><article class="reading"><a class="back" href="#archive">返回文章归档</a>${metadata(post)}<h1>${post.title}</h1><p class="lede">${post.summary}</p><p class="subtle">原型样稿</p>
-        <nav class="toc toc-inline" aria-label="本文目录"><strong>本文目录</strong><ol>${links}</ol></nav>
-        <div id="article-body">${post.sections.map(([heading, body, code], i) => `<section><h2 id="section-${i + 1}" tabindex="-1">${heading}</h2><p>${body}</p>${code ? `<div class="code-panel"><div class="code-bar"><span class="subtle mono">验收记录</span><button type="button" data-copy>复制</button></div><pre><code>${escapeHtml(code)}</code></pre></div>` : ''}</section>`).join('')}
-        ${post === posts[0] ? '<div class="table-scroll" tabindex="0"><table><caption>文章列表验收示例</caption><thead><tr><th scope="col">检查项</th><th scope="col">怎么验证</th><th scope="col">期望结果</th></tr></thead><tbody><tr><th scope="row">空列表</th><td>筛选无匹配内容</td><td>提示可以换一个主题</td></tr><tr><th scope="row">长标题</th><td>在手机宽度阅读两行以上标题</td><td>日期和标题清晰对齐</td></tr><tr><th scope="row">分页</th><td>筛选后切换到下一页</td><td>主题条件继续生效</td></tr></tbody></table></div>' : ''}</div>
-        ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${related.title}</a></div>` : ''}</article>
-        <nav class="toc" aria-label="本文目录"><strong>本文目录</strong><ol>${links}</ol></nav></div>`;
+      const blocks = markdownBlocks(post.body);
+      const links = blocks.filter(block => /^h[1-6]$/.test(block.type)).map((block, i) => `<li><a href="${postLink(post)}/${i + 1}">${escapeHtml(block.text)}</a></li>`).join('');
+      const toc = cssClass => links ? `<nav class="toc ${cssClass}" aria-label="本文目录"><strong>本文目录</strong><ol>${links}</ol></nav>` : '';
+      return `<div class="article-grid"><article class="reading"><a class="back" href="#archive">返回文章归档</a>${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p>${post.sample ? '<p class="subtle">原型样稿</p>' : ''}
+        ${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}
+        ${post.id === 'working-with-coding-agents' && post.sample ? '<div class="table-scroll" tabindex="0"><table><caption>文章列表验收示例</caption><thead><tr><th scope="col">检查项</th><th scope="col">怎么验证</th><th scope="col">期望结果</th></tr></thead><tbody><tr><th scope="row">空列表</th><td>筛选无匹配内容</td><td>提示可以换一个主题</td></tr><tr><th scope="row">长标题</th><td>在手机宽度阅读两行以上标题</td><td>日期和标题清晰对齐</td></tr><tr><th scope="row">分页</th><td>筛选后切换到下一页</td><td>主题条件继续生效</td></tr></tbody></table></div>' : ''}</div>
+        ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}</article>${toc('')}</div>`;
     }
 
     function updateProgress() {
@@ -139,15 +126,15 @@
         if (link.hash === `#${current}`) link.setAttribute('aria-current','page');
         else link.removeAttribute('aria-current');
       });
-      document.title = `${post ? post.title : ({archive:'文章归档',notes:'开发笔记',projects:'项目与实验',about:'关于本站'})[page] || '开发手记'} · itfetter`;
+      document.title = `${post ? post.title : ({archive:'文章归档',notes:'开发笔记',projects:'项目与实验',about:'关于本站'})[page] || settings.title} · ${settings.author}`;
       if (page === 'home') main.innerHTML = home();
       else if (page === 'archive') main.innerHTML = archive(key);
       else if (post) {
         if (!stayOnArticle) main.innerHTML = article(post);
       }
-      else if (page === 'notes') main.innerHTML = `<div class="page-intro"><h1>开发笔记</h1><p>短一些的观察、做法和踩坑记录。以下为原型样稿。</p></div>${indexCards(notes)}`;
+      else if (page === 'notes') main.innerHTML = `<div class="page-intro"><h1>开发笔记</h1><p>短一些的观察、做法和踩坑记录。</p></div>${indexCards(notes)}`;
       else if (page === 'projects') main.innerHTML = `<div class="page-intro"><h1>项目与实验</h1><p>小工具的构想，以及做东西时可以复用的流程样例。</p></div>${indexCards(projects)}`;
-      else if (page === 'about') main.innerHTML = `<article class="reading"><h1>关于这个博客</h1><p class="lede">itfetter 的个人开发手记。</p><p>这里会写自己动手做的小项目、日常和 AI 一起工作的体验，以及后来想翻回来看一眼的技术笔记。项目是怎么开始的、工具在哪一步帮了忙、做完后想改哪里，都是值得记下的内容。</p><h2>从哪里开始读</h2><p>可以去 <a class="prose-link" href="#archive">文章归档</a> 按主题找感兴趣的样稿，也可以去 <a class="prose-link" href="https://github.com/itfetter">GitHub</a> 看项目。</p></article>`;
+      else if (page === 'about') main.innerHTML = `<article class="reading"><h1>关于这个博客</h1><p class="lede">${escapeHtml(settings.description)}</p>${renderMarkdown(markdownBlocks(settings.about))}</article>`;
       else main.innerHTML = '<div class="page-intro"><h1>没有找到这个页面</h1><a class="quiet" href="#archive">浏览文章归档</a></div>';
       const heading = post && section && document.getElementById(`section-${section}`);
       if (heading) {
@@ -169,14 +156,14 @@
     function search() {
       const terms = query.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
       const matches = posts.filter(post => {
-        const content = [post.title, topics[post.topic], post.summary, ...post.sections.flat()].join(' ').toLowerCase();
+        const content = [post.title, topics[post.topic], post.summary, post.body].join(' ').toLowerCase();
         return terms.every(term => content.includes(term));
       });
       searchOptions = matches;
       selectedResult = -1;
       query.removeAttribute('aria-activedescendant');
       searchCount.textContent = terms.length ? `${matches.length} 篇匹配` : '最近文章';
-      results.innerHTML = matches.length ? matches.map((post, index) => `<div role="option" aria-selected="false" id="search-result-${index}" data-result="${index}"><strong>${post.title}</strong><small>${topics[post.topic]} · ${post.date}</small></div>`).join('') : '';
+      results.innerHTML = matches.length ? matches.map((post, index) => `<div role="option" aria-selected="false" id="search-result-${index}" data-result="${index}"><strong>${escapeHtml(post.title)}</strong><small>${topics[post.topic]} · ${post.date}</small></div>`).join('') : '';
       const empty = dialog.querySelector('.search-empty');
       if (empty) empty.remove();
       if (!matches.length) results.insertAdjacentHTML('afterend','<div class="search-empty"><p>没有找到相关文章。</p><button type="button" class="secondary" id="reset-search">清空搜索</button></div>');
