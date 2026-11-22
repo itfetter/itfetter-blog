@@ -104,6 +104,78 @@ window.blogContent = {
       "status": "published"
     }
   ],
+  "comments": {
+    "working-with-coding-agents": [
+      {
+        "id": "sample-ai-scope",
+        "author": "小周",
+        "body": "我也开始先写验收步骤。以前只交代「改好筛选」，后来补上「清空再选一次」，才发现列表会带着上一次的条件。",
+        "parent": "",
+        "created": "2026-11-19T02:20:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-ai-scope-reply",
+        "author": "阿简",
+        "body": "我在 `README.md` 里留了一个三步复现，把空列表和已有数据各跑一遍。换工具之后也能照着走。",
+        "parent": "sample-ai-scope",
+        "created": "2026-11-19T04:11:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-ai-review",
+        "author": "林栩",
+        "body": "想请教一下，遇到 AI 顺手改了范围之外的文件，你们通常会先撤掉这些改动，还是先保留一份 diff 再处理？",
+        "parent": "",
+        "created": "2026-11-20T12:35:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-ai-review-reply",
+        "author": "许舟",
+        "body": "我先用 `git diff --stat` 确认每个文件为什么变了，然后只摘出这次要交付的部分。顺手发现的问题单独记下来。",
+        "parent": "sample-ai-review",
+        "created": "2026-11-20T13:10:00Z",
+        "sample": true
+      }
+    ],
+    "small-tool-first-release": [
+      {
+        "id": "sample-tool-scope",
+        "author": "阿简",
+        "body": "我做书签工具时也砍掉了自动分类。先把导入、去重和重新导出跑通之后，身边的人终于能拿自己的数据试用了。",
+        "parent": "",
+        "created": "2026-11-13T07:05:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-tool-scope-reply",
+        "author": "小周",
+        "body": "尤其喜欢先给真实用户试一轮这个步骤。空文件和重复导入的问题，都是朋友顺手点两下才发现的。",
+        "parent": "sample-tool-scope",
+        "created": "2026-11-13T09:25:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-tool-feedback",
+        "author": "沈河",
+        "body": "第一次发布只保留一个反馈问题，对我也挺有帮助。我会问：你在哪一步停下来，想知道接下来该干什么？",
+        "parent": "",
+        "created": "2026-11-14T11:42:00Z",
+        "sample": true
+      }
+    ],
+    "same-task-two-prompts": [
+      {
+        "id": "sample-prompt-compare",
+        "author": "林栩",
+        "body": "对比提示词时固定同一份输入很实用。我还加了一个检查项，看看哪份输出能直接按步骤复现。",
+        "parent": "",
+        "created": "2026-10-30T03:15:00Z",
+        "sample": true
+      }
+    ]
+  },
   "settings": {
     "title": "开发手记",
     "author": "itfetter",

@@ -62,6 +62,16 @@
     const date = post => `<time datetime="${post.date}">${post.date.replaceAll('-', '.')}</time>`;
     const metadata = post => `<div class="meta"><span class="tag">${topics[post.topic]}</span>${date(post)}</div>`;
     const commentLabel = post => `${post.commentCount ?? 0} 条评论`;
+    const sampleCovers = new Map([
+      ['working-with-coding-agents', ['ai-workflow.jpg', '浅色桌面上的笔记本电脑与记录任务的方格本']],
+      ['small-tool-first-release', ['first-release.jpg', '桌面上的小键盘、蓝色 U 盘与索引卡片']]
+    ]);
+    const cover = post => {
+      const image = post.sample && sampleCovers.get(post.id);
+      if (!image) return '';
+      const [filename, alt] = image;
+      return `<img class="cover-image" src="assets/${filename}" alt="${alt}" width="900" height="600" decoding="async">`;
+    };
     const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<div class="row-content"><strong>${escapeHtml(post.title)}</strong><small>${escapeHtml(post.summary)}</small></div><span class="row-meta"><span class="tag">${topics[post.topic]}</span><span class="comment-count">${commentLabel(post)}</span></span></a></li>`;
     const progress = document.querySelector('#progress');
     let currentPage = '';
@@ -81,7 +91,7 @@
         <div><p class="hero-author">${escapeHtml(settings.author)} 的个人博客</p><h1 id="welcome">${escapeHtml(settings.title)}</h1>
         <p class="hero-description">${escapeHtml(settings.description)}</p>
         <div class="actions"><a class="primary" href="#archive">浏览文章</a><a class="secondary" href="#about">关于我</a></div></div>
-        ${lead ? `<a class="feature" href="${postLink(lead)}"><span class="feature-label">置顶文章</span><h2>${escapeHtml(lead.title)}</h2><p>${escapeHtml(lead.summary)}</p>${metadata(lead)}</a>` : ''}
+        ${lead ? `<a class="feature" href="${postLink(lead)}">${cover(lead)}<span class="feature-label">置顶文章</span><h2>${escapeHtml(lead.title)}</h2><p>${escapeHtml(lead.summary)}</p><div class="meta"><span class="tag">${topics[lead.topic]}</span>${date(lead)}<span class="comment-count">${commentLabel(lead)}</span></div></a>` : ''}
         </section>
         <div class="home-grid"><section class="section" aria-labelledby="latest-title"><div class="section-head"><h2 id="latest-title">最近文章</h2><a href="#archive">查看归档</a></div>${latest.length ? `<ul class="rows">${latest.map(row).join('')}</ul>` : '<p class="subtle">暂无最近文章。</p>'}</section>
         <aside class="home-aside" aria-label="主题和笔记"><section><h2>按主题浏览</h2><ul class="topic-list">${Object.entries(topics).map(([key, name]) => `<li><a href="#archive/${key}"><span>${name}</span><span>${posts.filter(post => post.topic === key).length}</span></a></li>`).join('')}</ul></section>
@@ -105,7 +115,7 @@
       const discussion = `<a class="toc-comments" href="${postLink(post)}/comments"><span>讨论与评论</span><span class="comment-count" data-comment-count>${commentLabel(post)}</span></a>`;
       const toc = cssClass => `<nav class="toc ${cssClass}" aria-label="本文目录"><strong>本文目录</strong>${links ? `<ol>${links}</ol>` : ''}${discussion}</nav>`;
       return `<div class="article-grid"><article class="reading"><a class="back" href="#archive">返回文章归档</a>${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p>${post.sample ? '<p class="meta">原型样稿</p>' : ''}
-        ${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}
+        ${cover(post)}${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}
         ${post.id === 'working-with-coding-agents' && post.sample ? '<div class="table-scroll" tabindex="0"><table><caption>文章列表验收示例</caption><thead><tr><th scope="col">检查项</th><th scope="col">怎么验证</th><th scope="col">期望结果</th></tr></thead><tbody><tr><th scope="row">空列表</th><td>筛选无匹配内容</td><td>提示可以换一个主题</td></tr><tr><th scope="row">长标题</th><td>在手机宽度阅读两行以上标题</td><td>日期和标题清晰对齐</td></tr><tr><th scope="row">分页</th><td>筛选后切换到下一页</td><td>主题条件继续生效</td></tr></tbody></table></div>' : ''}</div>
         ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}
         <section class="article-comments" aria-labelledby="section-comments"><div class="discussion-heading"><h2 id="section-comments" tabindex="-1">讨论与评论</h2><span class="comment-count" data-comment-count>${commentLabel(post)}</span></div>
@@ -140,7 +150,7 @@
         }
         const renderComment = item => {
           const body = escapeHtml(item.body).replace(/\x60([^\x60\n]+)\x60/g, '<code>$1</code>');
-          return `<article class="comment"><span class="comment-avatar" aria-hidden="true">${escapeHtml([...item.author][0] || '')}</span><div class="comment-content"><header><strong>${escapeHtml(item.author)}</strong><time datetime="${escapeHtml(item.created)}">${dates.format(new Date(item.created))}</time></header><p>${body}</p>${item.parent ? '' : `<button type="button" class="comment-reply-button" data-reply="${item.id}">回复<span class="sr-only"> ${escapeHtml(item.author)}</span></button>`}</div></article>`;
+          return `<article class="comment"><span class="comment-avatar" aria-hidden="true">${escapeHtml([...item.author][0] || '')}</span><div class="comment-content"><header><strong>${escapeHtml(item.author)}</strong>${item.sample ? '<span class="comment-sample">示例</span>' : ''}<time datetime="${escapeHtml(item.created)}">${dates.format(new Date(item.created))}</time></header><p>${body}</p>${item.parent ? '' : `<button type="button" class="comment-reply-button" data-reply="${item.id}">回复<span class="sr-only"> ${escapeHtml(item.author)}</span></button>`}</div></article>`;
         };
         list.innerHTML = threads.length ? threads.map(item => {
           const children = replies.get(item.id);

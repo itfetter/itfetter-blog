@@ -65,6 +65,8 @@ main:focus{outline:none}
 .feature:hover h2,.row:hover strong{color:var(--accent)}
 .feature p,.row small{font-size:.875rem;color:var(--muted)}
 .feature .meta{margin-top:3px}
+.cover-image{display:block;width:100%;height:auto;object-fit:cover;background:var(--subtle);border:1px solid var(--line);border-radius:6px}
+.feature .cover-image{aspect-ratio:2.45;width:100%;height:auto;margin-bottom:4px}
 .meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:.8125rem}
 .tag{color:var(--muted);font-size:.8125rem;font-weight:650}
 .home-grid{display:grid;grid-template-columns:minmax(0,1fr) 224px;gap:32px;border-top:1px solid var(--line);padding-top:28px}
@@ -117,6 +119,7 @@ h2.year{padding-bottom:8px;border-bottom:1px solid var(--line)}
 .back{display:inline-block;margin-bottom:21px}
 .reading .meta{margin-bottom:9px}
 .reading .lede{font-size:1.125rem;margin:12px 0 16px}
+.reading .cover-image{aspect-ratio:2.1;width:100%;height:auto;margin:20px 0 24px}
 .reading p{line-height:1.8;margin-bottom:14px;overflow-wrap:anywhere}
 .reading h2{font-size:1.4rem;margin:25px 0 8px;scroll-margin-top:88px;letter-spacing:-.025em}
 .toc{font-size:.875rem;color:var(--muted);border-left:1px solid var(--line);padding-left:12px}
@@ -208,6 +211,7 @@ pre{overflow:auto;margin:0;padding:11px 14px;font:.875rem/1.7 var(--mono)}
 .comment-avatar{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--selected);color:var(--accent);font-size:.875rem;font-weight:650}
 .comment-content header{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 12px;overflow-wrap:anywhere}
 .comment time{color:var(--muted);font-size:.8125rem}
+.comment-sample{color:var(--muted);font-size:.75rem;padding:0 4px;border:1px solid var(--line);border-radius:4px}
 .reading .comment p{white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 0}
 .comment-children{display:grid;gap:12px;border-left:2px solid var(--line);padding-left:12px;margin:8px 0 0 47px}
 .comment-children .comment-avatar{width:28px;height:28px}

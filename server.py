@@ -17,6 +17,8 @@ STATIC_FILES = {
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
     "/markdown.js": ("markdown.js", "text/javascript; charset=utf-8"),
+    "/assets/ai-workflow.jpg": ("assets/ai-workflow.jpg", "image/jpeg"),
+    "/assets/first-release.jpg": ("assets/first-release.jpg", "image/jpeg"),
 }
 SESSION_COOKIE = "itfetter_session"
 SESSIONS = set()

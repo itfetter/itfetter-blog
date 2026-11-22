@@ -5,6 +5,7 @@
 | 功能 | 源码定位 | 同步检查 |
 | --- | --- | --- |
 | 首页与主题入口 | `home()`、`topics`、`posts`、`notes`、`projects`，样式 `.hero`、`.feature`、`.home-grid` | 置顶链接、最近列表、主题文章数、窄屏重排 |
+| 样稿封面与评论 | `index.html` 的 `sampleCovers`、`cover()`，`assets/`，`server.py` 的静态文件映射，`content.js` 的 `comments` | 首页置顶与正文封面、示例标签、归档计数和楼中回复 |
 | 路由、导航与标题 | `render()`、`hashchange`、`.nav` | 从 URL 直接打开、浏览器返回、活动栏目、未知路由 |
 | 归档和筛选 | `archive()`、`row()`、`.filter-bar`、`.pill` | 年份分组、结果计数、重新筛选后的焦点 |
 | 文章阅读 | `article()`、`postLink()`、`updateProgress()`、`[data-copy]` | 目录定位、阅读进度、代码复制、表格横滚和相关页 |
