@@ -12,7 +12,7 @@
 | 笔记和项目 | `indexCards()`、`notes`、`projects` | 笔记详情展开，项目跳转的文章 `id` 仍存在 |
 | 后台登录 | `server.py` 的 `GET /admin`、`POST /admin/login`、`POST /admin/logout` | 未登录、错误密码、有效会话、退出、直接请求模板 |
 | 内容管理 | `admin.js` 的 `contentList()`、`openEditor()`，`/admin/content`、`content_store.py` 的 `update_content()` | 搜索和状态筛选、新建编辑、发布撤回、删除确认、前台同步 |
-| 文档编辑 | `admin.js` 的 `articleEditor()`、`markdown.js` | `/` 块菜单、调整块类型或顺序、Markdown 源码与预览往返、导出原文、旧草稿带入 |
+| 文档编辑 | `admin.js` 的 `articleEditor()`、`markdown.js` 的 `fromDocument()` 与 `clipboardBlocks()` | 连续输入、富文本或纯文本粘贴、跨块全选替换、插入点前后文字、撤销重做、`/` 菜单和 Markdown 往返 |
 | 站点设置 | `admin.js` 的 `settingsForm()`、`content_store.py` 的 `public_script()`、`index.html` 的 `settings` | 首页、页脚和关于页同步，置顶关联，静态导出排除草稿 |
 | 浅色和深色 | `:root`、`[data-theme]`、`updateThemeButton()`、`itfetter-theme` | 系统默认主题、手动切换、刷新恢复、对比度 |
 | 本地预览 | [start-preview.bat](start-preview.bat) | 根目录 `index.html` 返回 HTTP 200，端口只在本机监听 |
