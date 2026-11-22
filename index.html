@@ -102,10 +102,83 @@
       const blocks = markdownBlocks(post.body);
       const links = blocks.filter(block => /^h[1-6]$/.test(block.type)).map((block, i) => `<li><a href="${postLink(post)}/${i + 1}">${escapeHtml(block.text)}</a></li>`).join('');
       const toc = cssClass => links ? `<nav class="toc ${cssClass}" aria-label="本文目录"><strong>本文目录</strong><ol>${links}</ol></nav>` : '';
-      return `<div class="article-grid"><article class="reading"><a class="back" href="#archive">返回文章归档</a>${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p>${post.sample ? '<p class="subtle">原型样稿</p>' : ''}
+      return `<div class="article-grid"><article class="reading"><a class="back" href="#archive">返回文章归档</a>${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p><p class="meta">${post.sample ? '<span>原型样稿</span>' : ''}<a class="prose-link" href="${postLink(post)}/comments">查看评论</a></p>
         ${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}
         ${post.id === 'working-with-coding-agents' && post.sample ? '<div class="table-scroll" tabindex="0"><table><caption>文章列表验收示例</caption><thead><tr><th scope="col">检查项</th><th scope="col">怎么验证</th><th scope="col">期望结果</th></tr></thead><tbody><tr><th scope="row">空列表</th><td>筛选无匹配内容</td><td>提示可以换一个主题</td></tr><tr><th scope="row">长标题</th><td>在手机宽度阅读两行以上标题</td><td>日期和标题清晰对齐</td></tr><tr><th scope="row">分页</th><td>筛选后切换到下一页</td><td>主题条件继续生效</td></tr></tbody></table></div>' : ''}</div>
-        ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}</article>${toc('')}</div>`;
+        ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}
+        <section class="article-comments" aria-labelledby="section-comments"><h2 id="section-comments" tabindex="-1">讨论与评论</h2><div class="comment-list"></div><p class="comment-feedback" role="status">正在加载评论…</p><button type="button" class="secondary comment-retry" hidden>重新加载</button>
+        <form class="comment-form" hidden><label>昵称<input name="author" maxlength="40" autocomplete="nickname" required></label><div class="comment-reply" hidden><span></span><button type="button" class="secondary">取消回复</button></div><label>评论<textarea name="body" rows="4" maxlength="2000" required></textarea></label><button type="submit" class="primary">发表评论</button></form></section></article>${toc('')}</div>`;
+    }
+
+    function mountComments(post) {
+      const section = main.querySelector('.article-comments');
+      const endpoint = `./api/comments?post=${encodeURIComponent(post.id)}`;
+      const form = section.querySelector('form');
+      const list = section.querySelector('.comment-list');
+      const status = section.querySelector('.comment-feedback');
+      const retry = section.querySelector('.comment-retry');
+      const reply = section.querySelector('.comment-reply');
+      const submit = form.querySelector('[type=submit]');
+      let comments = [];
+      let parent = '';
+      const dates = new Intl.DateTimeFormat('zh-CN', {dateStyle:'medium',timeStyle:'short'});
+
+      function display(items) {
+        comments = items;
+        const renderComment = item => `<article class="comment"><header><strong>${escapeHtml(item.author)}</strong><time datetime="${escapeHtml(item.created)}">${dates.format(new Date(item.created))}</time></header><p>${escapeHtml(item.body)}</p>${item.parent ? '' : `<button type="button" class="comment-reply-button" data-reply="${item.id}">回复<span class="sr-only"> ${escapeHtml(item.author)}</span></button>`}</article>`;
+        list.innerHTML = items.length ? items.filter(item => !item.parent).map(item => `<div class="comment-thread">${renderComment(item)}${items.some(child => child.parent === item.id) ? `<div class="comment-children">${items.filter(child => child.parent === item.id).map(renderComment).join('')}</div>` : ''}</div>`).join('') : '<p class="subtle">还没有评论。欢迎分享你的想法。</p>';
+        section.querySelector('h2').textContent = `讨论与评论（${items.length}）`;
+      }
+
+      function setReply(item) {
+        parent = item?.id || '';
+        reply.hidden = !item;
+        reply.querySelector('span').textContent = item ? `正在回复 ${item.author}` : '';
+        submit.textContent = item ? '发布回复' : '发表评论';
+      }
+
+      async function loadComments() {
+        retry.hidden = true;
+        status.textContent = '正在加载评论…';
+        try {
+          const response = await fetch(endpoint);
+          if (!response.ok) throw new Error();
+          display(await response.json());
+          form.hidden = false;
+          status.textContent = '';
+        } catch {
+          status.textContent = '评论暂时不可用。';
+          retry.hidden = false;
+        }
+      }
+
+      retry.addEventListener('click',loadComments);
+      reply.querySelector('button').addEventListener('click', () => { setReply(); form.elements.body.focus(); });
+      list.addEventListener('click', event => {
+        const button = event.target.closest('[data-reply]');
+        if (button) {
+          setReply(comments.find(item => item.id === button.dataset.reply));
+          form.elements.body.focus();
+        }
+      });
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const body = {...Object.fromEntries(new FormData(form)),parent};
+        submit.disabled = true;
+        status.textContent = '正在发布…';
+        try {
+          const response = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || '发布失败，请重试。');
+          display(result);
+          form.elements.body.value = '';
+          setReply();
+          status.textContent = '已发布。';
+        } catch (error) {
+          status.textContent = error instanceof SyntaxError || error instanceof TypeError ? '发布失败，请检查连接后重试。' : error.message;
+        } finally { submit.disabled = false; }
+      });
+      loadComments();
     }
 
     function updateProgress() {
@@ -130,7 +203,10 @@
       if (page === 'home') main.innerHTML = home();
       else if (page === 'archive') main.innerHTML = archive(key);
       else if (post) {
-        if (!stayOnArticle) main.innerHTML = article(post);
+        if (!stayOnArticle) {
+          main.innerHTML = article(post);
+          mountComments(post);
+        }
       }
       else if (page === 'notes') main.innerHTML = `<div class="page-intro"><h1>开发笔记</h1><p>短一些的观察、做法和踩坑记录。</p></div>${indexCards(notes)}`;
       else if (page === 'projects') main.innerHTML = `<div class="page-intro"><h1>项目与实验</h1><p>小工具的构想，以及做东西时可以复用的流程样例。</p></div>${indexCards(projects)}`;

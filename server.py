@@ -8,7 +8,7 @@ from pathlib import Path
 from threading import Lock
 from urllib.parse import parse_qs, urlsplit
 
-from content_store import public_script, read_content, update_content, write_content
+from content_store import add_article_comment, article_comments, public_script, read_content, update_content, write_content
 
 
 ROOT = Path(__file__).resolve().parent
@@ -113,6 +113,8 @@ class BlogHandler(BaseHTTPRequestHandler):
             with CONTENT_LOCK:
                 content = public_script(read_content())
             self.send_content(HTTPStatus.OK, content.encode("utf-8"), "text/javascript; charset=utf-8", private=True)
+        elif path == "/api/comments":
+            self.handle_comments()
         elif path in ("/admin/content", "/admin/editor.js"):
             if self.session_token() not in SESSIONS:
                 self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "请重新登录后台。"})
@@ -136,6 +138,9 @@ class BlogHandler(BaseHTTPRequestHandler):
         if path == "/admin/content":
             self.save_admin_content()
             return
+        if path == "/api/comments":
+            self.handle_comments()
+            return
         if path == "/admin/logout":
             SESSIONS.discard(self.session_token())
             self.redirect_to_admin(f"{SESSION_COOKIE}=; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=0")
@@ -157,6 +162,30 @@ class BlogHandler(BaseHTTPRequestHandler):
         token = secrets.token_urlsafe(32)
         SESSIONS.add(token)
         self.redirect_to_admin(f"{SESSION_COOKIE}={token}; Path=/admin; HttpOnly; SameSite=Strict")
+
+    def handle_comments(self):
+        post_id = parse_qs(urlsplit(self.path).query).get("post", [""])[0]
+        try:
+            if self.command == "POST":
+                length = self.headers.get("Content-Length", "")
+                if self.headers.get_content_type() != "application/json" or not length.isdecimal() or not 0 < int(length) <= 26000:
+                    raise ValueError("评论格式有误或内容过长。")
+                payload = json.loads(self.rfile.read(int(length)))
+            with CONTENT_LOCK:
+                data = read_content()
+                if self.command == "POST":
+                    comments = add_article_comment(data, post_id, payload)
+                    write_content(data)
+                else:
+                    comments = article_comments(data, post_id)
+        except LookupError as error:
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": str(error)})
+        except (ValueError, UnicodeError) as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+        except OSError:
+            self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "评论暂时无法读取或保存。"})
+        else:
+            self.send_json(HTTPStatus.OK, comments)
 
     def save_admin_content(self):
         if self.session_token() not in SESSIONS:

@@ -13,6 +13,8 @@
 | 后台登录 | `server.py` 的 `GET /admin`、`POST /admin/login`、`POST /admin/logout` | 未登录、错误密码、有效会话、退出、直接请求模板 |
 | 内容管理 | `admin.js` 的 `contentList()`、`openEditor()`，`/admin/content`、`content_store.py` 的 `update_content()` | 搜索和状态筛选、新建编辑、发布撤回、删除确认、前台同步 |
 | 文档编辑 | `admin.js` 的 `articleEditor()`、`snapshot()` 和 `stepHistory()`，`markdown.js` 的 `fromDocument()` 与 `clipboardBlocks()` | 连续输入、粘贴、正文和手柄的两段悬停、选区保留、列表项转换及 Markdown 往返；跨输入、粘贴和块操作的连续撤销与重做 |
+| 文章发布 | `admin.js` 的 `contentList()`、`openEditor()`，`content_store.py` 的 `update_content()`、`public_script()` | 保存草稿不改变线上版本、已发布与有草稿同时显示、发布更新、显式撤回、既有文章与直达链接 |
+| 文章评论 | `index.html` 的 `mountComments()`，`server.py` 的 `/api/comments`，`content_store.py` 的评论读写 | 顶层评论和回复、刷新后保留、无评论和接口不可用提示、仅开放已发布文章 |
 | 站点设置 | `admin.js` 的 `settingsForm()`、`content_store.py` 的 `public_script()`、`index.html` 的 `settings` | 首页、页脚和关于页同步，置顶关联，静态导出排除草稿 |
 | 浅色和深色 | `:root`、`[data-theme]`、`updateThemeButton()`、`itfetter-theme` | 系统默认主题、手动切换、刷新恢复、对比度 |
 | 本地预览 | [start-preview.bat](start-preview.bat) | 根目录 `index.html` 返回 HTTP 200，端口只在本机监听 |

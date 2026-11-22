@@ -1,6 +1,6 @@
 import json
 import secrets
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -20,7 +20,7 @@ def read_content():
 def public_script(data):
     public = {"topics": data["topics"], "settings": data["settings"]}
     for collection in COLLECTIONS:
-        public[collection] = [item for item in data[collection] if item["status"] == "published"]
+        public[collection] = [{key: value for key, value in item.items() if key != "draft"} for item in data[collection] if item["status"] == "published"]
     return "window.blogContent = " + json.dumps(public, ensure_ascii=False) + ";\n"
 
 
@@ -63,9 +63,17 @@ def update_content(data, change):
     current = next((item for item in items if item["id"] == item_id), None)
     if item_id and current is None:
         raise ValueError("该内容不存在，请刷新后台后重试。")
+    if change.get("action") == "withdraw":
+        if collection != "posts" or not current or current["status"] != "published":
+            raise ValueError("只能撤回已发布的文章。")
+        items[items.index(current)] = current.get("draft", {**current, "status": "draft"})
+        if data["settings"]["featured"] == item_id:
+            data["settings"]["featured"] = ""
+        return
     if values is None and current is not None:
         items.remove(current)
         if collection == "posts":
+            data.get("comments", {}).pop(item_id, None)
             for project in data["projects"]:
                 if project.get("post") == item_id:
                     project["post"] = ""
@@ -92,6 +100,9 @@ def update_content(data, change):
         fields["id"] = item_id or secrets.token_hex(6)
         if current is None:
             items.append(fields)
+        elif collection == "posts" and current["status"] == "published" and fields["status"] == "draft":
+            current["draft"] = fields
+            return
         else:
             items[items.index(current)] = fields
     else:
@@ -100,6 +111,24 @@ def update_content(data, change):
     if collection == "posts" and data["settings"]["featured"] == item_id:
         if values is None or fields["status"] != "published":
             data["settings"]["featured"] = ""
+
+
+def article_comments(data, post_id):
+    if not any(post["id"] == post_id and post["status"] == "published" for post in data["posts"]):
+        raise LookupError("这篇文章暂无开放的评论区。")
+    return data.get("comments", {}).get(post_id, [])
+
+
+def add_article_comment(data, post_id, payload):
+    comments = article_comments(data, post_id)
+    if not isinstance(payload, dict):
+        raise ValueError("评论格式有误。")
+    comment = text_fields(payload, {"author": 40, "body": 2000, "parent": 100}, ("parent",))
+    if comment["parent"] and not any(item["id"] == comment["parent"] and not item["parent"] for item in comments):
+        raise ValueError("回复的评论已不存在。")
+    comment.update(id=secrets.token_hex(8), created=datetime.now(timezone.utc).isoformat())
+    data.setdefault("comments", {}).setdefault(post_id, []).append(comment)
+    return data["comments"][post_id]
 
 
 def write_content(data):
