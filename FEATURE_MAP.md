@@ -11,6 +11,7 @@
 | 搜索弹层 | `#search`、`search()`、`openSearch()`、`openResult()`、`#query` 键盘处理 | `/` 或 `Ctrl/Cmd+K`、正文关键词、无结果恢复、方向键、Enter 与 Esc |
 | 笔记和项目 | `indexCards()`、`notes`、`projects` | 笔记详情展开，项目跳转的文章 `id` 仍存在 |
 | 后台登录 | `server.py` 的 `GET /admin`、`POST /admin/login`、`POST /admin/logout` | 未登录、错误密码、有效会话、退出、直接请求模板 |
+| 后台栏目 | `admin.js` 初始化的 `requestedView` 和 `switchView()` | 栏目切换更新地址，刷新与直达恢复栏目，无效片段回到总览 |
 | 内容管理 | `admin.js` 的 `contentList()`、`openEditor()`，`/admin/content`、`content_store.py` 的 `update_content()` | 搜索和状态筛选、新建编辑、发布撤回、删除确认、前台同步 |
 | 文档编辑 | `admin.js` 的 `articleEditor()`、`snapshot()` 和 `stepHistory()`，`markdown.js` 的 `fromDocument()` 与 `clipboardBlocks()` | 连续输入、粘贴、正文和手柄的两段悬停、选区保留、列表项转换及 Markdown 往返；跨输入、粘贴和块操作的连续撤销与重做 |
 | 文章发布 | `admin.js` 的 `contentList()`、`openEditor()`，`content_store.py` 的 `update_content()`、`public_script()` | 保存草稿不改变线上版本、已发布与有草稿同时显示、发布更新、显式撤回、既有文章与直达链接 |

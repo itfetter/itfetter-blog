@@ -9,7 +9,8 @@
   const textarea = (name, label, value, limit, required = true) => `<label class="admin-field">${label}<textarea name="${name}" maxlength="${limit}"${required ? ' required' : ''}>${escape(value || '')}</textarea></label>`;
   const select = (name, label, options, selected) => `<label class="admin-field">${label}<select name="${name}">${options.map(([value,text]) => `<option value="${escape(value)}"${value === selected ? ' selected' : ''}>${escape(text)}</option>`).join('')}</select></label>`;
   let data;
-  let view = 'overview';
+  const requestedView = location.hash.slice(1);
+  let view = Object.hasOwn(labels,requestedView) || requestedView === 'settings' ? requestedView : 'overview';
   let dirty = false;
   let busy = false;
 
@@ -38,6 +39,8 @@
   function switchView(next) {
     if (!leaveEditor()) return;
     view = next;
+    const fragment = next === 'overview' ? '' : `#${next}`;
+    history.replaceState(history.state,'',`${location.pathname}${location.search}${fragment}`);
     dirty = false;
     notify('');
     render();
