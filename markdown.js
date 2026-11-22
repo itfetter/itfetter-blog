@@ -122,7 +122,7 @@
       block.type === 'p' ? block.text.split('\n').filter(line => line.trim()).map(text => ({type:'p',text})) : [block]);
   }
 
-  function render(blocks, article = false) {
+  function render(blocks, article = false, copyCode = article) {
     let headingIndex = 0;
     return blocks.map(({type,text,language,start = 1}) => {
       if (/^h[1-6]$/.test(type)) {
@@ -132,7 +132,7 @@
       }
       if (type === 'code') {
         const code = `<pre${language ? ` data-language="${escape(language)}"` : ''}><code>${escape(text)}</code></pre>`;
-        return article ? `<div class="code-panel"><div class="code-bar"><span class="subtle mono">${escape(language || '代码')}</span><button type="button" data-copy>复制</button></div>${code}</div>` : code;
+        return copyCode ? `<div class="code-panel"><div class="code-bar"><span class="subtle mono">${escape(language || '代码')}</span><button type="button" data-copy>复制</button></div>${code}</div>` : code;
       }
       if (type === 'ul' || type === 'ol') return `<${type}${type === 'ol' && start !== 1 ? ` start="${start}"` : ''}>${text.split('\n').map(line => `<li>${inline(line)}</li>`).join('')}</${type}>`;
       const tag = type === 'quote' ? 'blockquote' : 'p';

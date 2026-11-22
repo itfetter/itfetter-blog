@@ -166,10 +166,10 @@
     const localDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     const status = select('status','发布状态', [['draft','草稿'],['published','已发布']], item.status || 'draft');
     const date = input('date','发布日期',item.date || localDate,10,'date');
-    const kind = input('kind','分类或状态说明',item.kind,40);
+    const kind = input('kind',collection === 'notes' ? '笔记类别' : '项目进度',item.kind,40);
     const articleOptions = [['','无关联'],...data.posts.map(post => [post.id,post.title])];
     const fields = isPost ? `${select('topic','文章主题',Object.entries(data.topics),item.topic || Object.keys(data.topics)[0])}${date}` : `${kind}${collection === 'notes' ? date : select('post','关联文章',articleOptions,item.post || '')}${status}`;
-    const details = `${textarea('text','简短说明',item.text,350)}${collection === 'notes' ? textarea('detail','笔记正文',item.detail,8000,false) : input('url','项目链接',item.url,300,'url',false)}`;
+    const details = `${textarea('text','简短说明',item.text,350)}${textarea('detail',collection === 'notes' ? '笔记正文（Markdown）' : '项目详情（Markdown）',item.detail,8000,false)}${collection === 'projects' ? input('url','项目链接',item.url,300,'url',false) : ''}`;
     const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<p class="draft-save-status subtle" role="status">${item.status === 'draft' ? '草稿已保存。' : '编辑后自动保存草稿。'}</p><details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}</details></div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
     const actions = isPost ? `<p class="subtle">${published ? '保存草稿后，读者仍看到已发布版本。' : '发布后，文章会出现在博客上。'}</p><button type="submit" class="secondary" name="status" value="draft">保存草稿</button><button type="submit" class="primary" name="status" value="published">${published ? '发布更新' : '发布文章'}</button>` : `<button type="submit" class="primary">保存${labels[collection]}</button>`;
     page.innerHTML = `<div class="admin-page-head"><div><button type="button" class="admin-back" id="return-list">返回${labels[collection]}列表</button><h2>${item.id ? '编辑' : '新建'}${labels[collection]}</h2></div>${published ? '<button type="button" class="secondary" id="withdraw-post">撤回发布</button>' : ''}</div>

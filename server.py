@@ -19,6 +19,8 @@ STATIC_FILES = {
     "/markdown.js": ("markdown.js", "text/javascript; charset=utf-8"),
     "/assets/ai-workflow.jpg": ("assets/ai-workflow.jpg", "image/jpeg"),
     "/assets/first-release.jpg": ("assets/first-release.jpg", "image/jpeg"),
+    "/assets/markdown-preview.jpg": ("assets/markdown-preview.jpg", "image/jpeg"),
+    "/assets/local-metrics.jpg": ("assets/local-metrics.jpg", "image/jpeg"),
     "/assets/itfetter-icon.svg": ("assets/itfetter-icon.svg", "image/svg+xml"),
 }
 SESSION_COOKIE = "itfetter_session"

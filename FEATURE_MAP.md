@@ -12,7 +12,7 @@
 | 归档和筛选 | `archive()`、`row()`、`.filter-bar`、`.pill` | 年份分组、结果计数、重新筛选后的焦点 |
 | 文章阅读 | `article()`、`#article-return`、`postLink()`、`updateProgress()`、`[data-copy]` | 导航下方固定返回、目录定位、阅读进度、代码复制、表格横滚和相关页 |
 | 搜索弹层 | `#search`、`search()`、`openSearch()`、`openResult()`、`#query` 键盘处理 | `/` 或 `Ctrl/Cmd+K`、正文关键词、无结果恢复、方向键、Enter 与 Esc |
-| 笔记和项目 | `indexCards()`、`notes`、`projects` | 笔记详情展开，项目跳转的文章 `id` 仍存在 |
+| 笔记和项目 | `notesPage()`、`projectsPage()`、`projectCards()`、`admin.js` 的 `openEditor()`、`content_store.py` 的 `update_content()` | 笔记分类和正文展开、项目详情与关联文章、后台 Markdown 保存 |
 | 后台登录 | `server.py` 的 `GET /admin`、`POST /admin/login`、`POST /admin/logout` | 未登录、错误密码、有效会话、退出、直接请求模板 |
 | 后台栏目 | `admin.js` 初始化的 `requestedView` 和 `switchView()` | 栏目切换更新地址，刷新与直达恢复栏目，无效片段回到总览 |
 | 内容管理 | `admin.js` 的 `contentList()`、`openEditor()`，`/admin/content`、`content_store.py` 的 `update_content()` | 搜索和状态筛选、新建编辑、发布撤回、删除确认、前台同步 |
@@ -23,4 +23,4 @@
 | 浅色和深色 | `:root`、`[data-theme]`、`updateThemeButton()`、`itfetter-theme` | 系统默认主题、手动切换、刷新恢复、对比度 |
 | 本地预览 | [start-preview.bat](start-preview.bat) | 根目录 `index.html` 返回 HTTP 200，端口只在本机监听 |
 
-公开路由格式为 `#home`、`#archive[/主题]`、`#post/文章ID[/小节号]`、`#notes`、`#projects`、`#about`。管理后台通过本机 `/admin` 登录进入。搜索只读取已发布的文章。主题偏好按浏览器和站点地址保存，后台草稿保存在项目目录。
+公开路由格式为 `#home`、`#archive[/主题]`、`#post/文章ID[/小节号]`、`#notes[/笔记ID]`、`#notes/category/类别`、`#projects[/项目ID]`、`#about`。搜索覆盖已发布的文章、笔记和项目。管理后台通过本机 `/admin` 登录进入。主题偏好按浏览器和站点地址保存，后台草稿保存在项目目录。

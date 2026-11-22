@@ -92,7 +92,7 @@ def update_content(data, change):
         elif collection == "notes":
             fields = text_fields(values, {**common, "kind": 40, "date": 10, "text": 350, "detail": 8000}, ("detail",))
         else:
-            fields = text_fields(values, {**common, "kind": 40, "text": 350, "post": 100, "url": 300}, ("post", "url"))
+            fields = text_fields(values, {**common, "kind": 40, "text": 350, "detail": 8000, "post": 100, "url": 300}, ("detail", "post", "url"))
             validate_url(fields["url"])
             if fields["post"] and not any(post["id"] == fields["post"] for post in data["posts"]):
                 raise ValueError("请选择现有文章作为项目关联。")
@@ -101,6 +101,8 @@ def update_content(data, change):
         if "date" in fields:
             fields["date"] = date.fromisoformat(fields["date"]).isoformat()
         fields["id"] = item_id or secrets.token_hex(6)
+        if collection != "posts" and current and current.get("sample"):
+            fields["sample"] = True
         if current is None:
             items.append(fields)
         elif collection == "posts" and current["status"] == "published" and fields["status"] == "draft":

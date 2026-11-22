@@ -6,6 +6,46 @@ window.blogContent = {
   },
   "posts": [
     {
+      "status": "published",
+      "sample": true,
+      "id": "markdown-preview-roundtrip",
+      "title": "给 Markdown 预览做一次来回检查",
+      "date": "2026-11-23",
+      "summary": "用同一份笔记检查编辑、预览和导出，再用一段短脚本统计代码围栏。",
+      "body": "## 准备一份有代表性的笔记\n\n包含一个标题、两层列表、一段行内代码和一个多行代码块。分别从源码模式和文档模式打开，关注列表层级和换行。\n\n## 检查导出的 Markdown\n\n下面的 Python 脚本列出三反引号所在的行，用来手工对照导出前后的结果。\n\n```python\nfrom pathlib import Path\n\nnote = Path('dev-note.md').read_text(encoding='utf-8')\nfences = [\n    number\n    for number, line in enumerate(note.splitlines(), start=1)\n    if line.lstrip().startswith('```')\n]\nprint('代码围栏所在行：', fences)\n```\n\n## 回到预览再看一遍\n\n在另一个编辑器重新打开导出文件，核对正文顺序。最后回到文章页复制代码块，检查空格和缩进能否一起保留。",
+      "topic": "dev"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "read-local-preview-metrics",
+      "title": "看一次页面加载，把慢在哪里记下来",
+      "date": "2026-11-22",
+      "summary": "用浏览器自带的 Performance 接口记录加载时间，再按资源类型排查。",
+      "body": "## 先记录一次普通访问\n\n打开本地首页和一篇带图文章，各记录一次页面导航时间。一次慢加载可能只是网络抖动，多记一两次才好比较。\n\n## 用代码读取导航时间\n\n下面的片段读取当前页面的导航数据，可以在浏览器控制台运行。\n\n```js\nconst [navigation] = performance.getEntriesByType('navigation');\nif (navigation) {\n  console.table({\n    responseMs: Math.round(navigation.responseEnd),\n    interactiveMs: Math.round(navigation.domInteractive),\n    loadedMs: Math.round(navigation.loadEventEnd)\n  });\n}\n```\n\n## 单独看图片大小\n\n对比首页封面和正文图的实际传输大小，再看首屏有没有加载用不到的图。把最明显的一项写进下一次迭代。",
+      "topic": "dev"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "local-preview-release-checklist",
+      "topic": "dev",
+      "date": "2026-11-23",
+      "title": "给本地预览做一份发布前清单",
+      "summary": "从首页、文章、笔记到手机宽度，记录每次发版前真正需要复查的几条路径。",
+      "body": "## 按读者的动作来排检查\n\n我从首页打开一篇文章，跳到讨论区，再点返回。随后从带筛选的归档重复一次。两条路径的目标不同，所以分别写出预期页面，也顺便看刷新后是否还在原来的位置。\n\n## 内容不足的页面也要打开\n\n样稿能帮助检查列表密度、标题折行和评论串。再找一篇零评论文章和一条没有正文的笔记，看页面给出来的状态是不是自然。发布前则把示例作者和示例数据逐条过一遍。\n\n## 留下最短的检查记录\n\n我把检查结果分成读者端和写作台两行。前台记录手机宽度、浏览路径与评论计数，后台记录草稿与已发布内容是否隔离。下次改动时就知道要重新跑哪一组。"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "ai-draft-review-session",
+      "topic": "ai",
+      "date": "2026-11-21",
+      "title": "让 AI 帮我审一遍改动，哪些意见值得留",
+      "summary": "用同一次小改动比较两种审查提示，记录能复核的建议与泛泛而谈的意见。",
+      "body": "## 先给它一份能读懂的改动\n\n这次只处理搜索弹层的空状态和键盘路径。我提供改动前后的操作步骤、预期结果，以及涉及的文件，再请工具按影响程度列问题。\n\n## 只保留能重复验证的意见\n\n「交互不够顺滑」很难行动。「输入一个不存在的词，再按清空按钮，光标应该回到输入框」则能当场检查，也能在下次修改时重新使用。\n\n## 把已验证和待确认分开\n\n手动检查过的路径写进记录，缺少数据或环境的场景单独标明。评审文本的长度不重要，重要的是能否交给另一个人重新走一遍。"
+    },
+    {
       "id": "working-with-coding-agents",
       "topic": "ai",
       "date": "2026-11-18",
@@ -68,6 +108,76 @@ window.blogContent = {
   ],
   "notes": [
     {
+      "status": "published",
+      "sample": true,
+      "id": "note-js-list-sort",
+      "date": "2026-11-23",
+      "kind": "开发便笺",
+      "title": "按日期排笔记，先复制数组",
+      "text": "首页和归档共用源数据时，复制后再排序能避免修改原顺序。",
+      "detail": "`YYYY-MM-DD` 可以按字符串排序。\n\n```js\nconst recent = [...notes]\n  .sort((a, b) => b.date.localeCompare(a.date))\n  .slice(0, 5);\n```"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "note-check-markdown-fence",
+      "date": "2026-11-22",
+      "kind": "写作方法",
+      "title": "写代码示例时顺手留一份输入",
+      "text": "给复制代码的人留一个小输入和预期结果，方便自己先跑一遍。",
+      "detail": "例如，验证一个简单的文本清洗函数。\n\n```python\ndef unique_lines(text):\n    return list(dict.fromkeys(text.splitlines()))\n\nassert unique_lines('a\\nb\\na') == ['a', 'b']\n```"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "note-search-focus",
+      "date": "2026-11-23",
+      "kind": "开发便笺",
+      "title": "搜索清空后，把光标放回输入框",
+      "text": "无结果时点击清空，下一步通常还是输入关键词。",
+      "detail": "用「完全匹配不到」作为关键词，按清空后立即键入新词。页面应直接出现新结果。再按 `Esc` 检查焦点是否回到打开搜索的按钮。"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "note-model-input",
+      "date": "2026-11-22",
+      "kind": "AI 实测",
+      "title": "比较模型前，先固定输入",
+      "text": "同一次实验保留问题、输入材料和验收条件，方便下次重跑。",
+      "detail": "我会把对话压到一页，只保留任务、背景和输出约束。每轮只改一个变量。\n\n- 记录模型和日期\n- 保留原输入与失败示例\n- 用同一份验收条件比较输出"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "note-phone-check",
+      "date": "2026-11-21",
+      "kind": "开发便笺",
+      "title": "手机宽度下先检查长标题",
+      "text": "用包含中英文、数字和长文件名的标题检查列表。",
+      "detail": "先以 `390px` 宽度打开归档，再进入正文和评论区。标题、日期、评论数应该自然换行。代码块可以内部横向滚动，整页应该保持在视口内。"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "note-project-log",
+      "date": "2026-11-19",
+      "kind": "写作方法",
+      "title": "项目复盘留三句话就够",
+      "text": "写下做成了什么、为什么删掉某个需求、下一次先修哪里。",
+      "detail": "发布后补记一条真实反馈，尤其是读者在哪个步骤卡住。等到下一次更新，再把当时的决定和现在的结果对照起来。"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "note-markdown-export",
+      "date": "2026-11-16",
+      "kind": "开发便笺",
+      "title": "导出 Markdown 后再打开一次",
+      "text": "用普通文本编辑器验证标题、代码块和换行是否还在。",
+      "detail": "检查一篇同时包含列表和 `inline code` 的草稿。导出后在另一种编辑器打开，确认段落顺序和代码围栏与预览一致。"
+    },
+    {
       "kind": "写作方法",
       "date": "2026-11-20",
       "title": "把 AI 实测写成能重做的记录",
@@ -88,6 +198,46 @@ window.blogContent = {
   ],
   "projects": [
     {
+      "status": "published",
+      "sample": true,
+      "id": "project-markdown-preview",
+      "kind": "迭代中",
+      "title": "Markdown 预览工具",
+      "text": "把 Markdown 源码、渲染结果和导出检查放在同一个小工具里。",
+      "post": "markdown-preview-roundtrip",
+      "detail": "## 目前能做什么\n\n预览标题、列表、代码块和行内代码。验证时先复制一段代码，再导出 Markdown 给另一个编辑器打开。\n\n## 调试示例\n\n```js\nconst lines = markdown.split(/\\r?\\n/);\nconst nonEmpty = lines.filter(line => line.trim());\nconsole.log(`${nonEmpty.length} 行非空内容`);\n```\n\n## 下一步\n\n将跨编辑器的差异写成两三个能重复运行的样本。"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "project-blog-workbench",
+      "kind": "迭代中",
+      "title": "开发手记写作台",
+      "text": "用一个本地后台管理文章、笔记、项目和站点设置，再把已发布内容交给静态站点。",
+      "post": "local-preview-release-checklist",
+      "detail": "## 已完成\n\n文章支持文档编辑、Markdown 源码和预览，停笔后自动存为草稿。读者端可以按主题浏览文章，也可以从目录跳到评论区。\n\n## 下一步\n\n用一篇正式文章走完写作、发布和静态导出，记下最费时间的步骤。"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "project-ai-run-log",
+      "kind": "原型",
+      "title": "AI 实测记录模板",
+      "text": "为一次 AI 工具体验记录任务、材料、验收步骤和失败实例。",
+      "post": "ai-draft-review-session",
+      "detail": "## 解决的问题\n\n零散的对话截图很难重做。模板先保留原问题，再记录每次尝试改了哪条约束，最后附上能复核的输出。\n\n## 当前进度\n\n已有一套 Markdown 记录结构。下一轮打算用相同任务跑两次，检查记录是否足够别人复用。"
+    },
+    {
+      "status": "published",
+      "sample": true,
+      "id": "project-preview-checks",
+      "kind": "计划中",
+      "title": "本地博客发布前检查表",
+      "text": "把首页、归档、笔记、评论区和手机端的主要路径整理成可重复的检查步骤。",
+      "post": "local-preview-release-checklist",
+      "detail": "## 第一版范围\n\n- 从首页和分类归档各打开一篇文章\n- 在笔记页筛选、展开和刷新\n- 检查手机宽度下的长标题和代码块\n\n先用人工检查表记录结果，再考虑哪些步骤值得自动化。"
+    },
+    {
       "kind": "项目构想",
       "title": "浏览器书签整理器",
       "text": "把网址清单变成一份可以检查、去重和复制的分享列表。",
@@ -105,6 +255,96 @@ window.blogContent = {
     }
   ],
   "comments": {
+    "markdown-preview-roundtrip": [
+      {
+        "id": "sample-markdown-copy",
+        "author": "阿简",
+        "body": "我还加了一个 Tab 缩进和行尾空格。跨编辑器时，这两类变化都容易漏掉。",
+        "parent": "",
+        "created": "2026-11-23T05:10:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-markdown-copy-reply",
+        "author": "小周",
+        "body": "我会把原文和复制出来的内容都放进 `diff` 对一下。复制以后格式还在也得检查。",
+        "parent": "sample-markdown-copy",
+        "created": "2026-11-23T05:38:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-markdown-case",
+        "author": "林栩",
+        "body": "代码本身包含三反引号时，可以用更长的围栏包住示例。",
+        "parent": "",
+        "created": "2026-11-23T06:26:00Z",
+        "sample": true
+      }
+    ],
+    "read-local-preview-metrics": [
+      {
+        "id": "sample-metrics-reload",
+        "author": "沈河",
+        "body": "记一次普通加载、一次刷新很有用。我之前只看刷新后的数据，漏算了第一次访问的图片。",
+        "parent": "",
+        "created": "2026-11-23T04:30:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-metrics-reload-reply",
+        "author": "阿简",
+        "body": "我会顺手记下刷新方式，避免把普通刷新和清缓存后的数字放在一列。",
+        "parent": "sample-metrics-reload",
+        "created": "2026-11-23T04:47:00Z",
+        "sample": true
+      }
+    ],
+    "notes-worth-keeping": [
+      {
+        "id": "sample-notes-conditions",
+        "author": "许舟",
+        "body": "短笔记里保留输入和环境就很实用。我喜欢在开头写清楚当时具体卡在哪一步。",
+        "parent": "",
+        "created": "2026-11-23T03:44:00Z",
+        "sample": true
+      }
+    ],
+    "ai-draft-review-session": [
+      {
+        "id": "sample-review-verify",
+        "author": "小周",
+        "body": "把「按哪个按钮」写清之后，审查意见好验证。我用同一组操作对照改动前后。",
+        "parent": "",
+        "created": "2026-11-23T07:12:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-review-verify-reply",
+        "author": "林栩",
+        "body": "我会标记哪条结论只看了代码、哪条实际点过页面。",
+        "parent": "sample-review-verify",
+        "created": "2026-11-23T07:43:00Z",
+        "sample": true
+      }
+    ],
+    "local-preview-release-checklist": [
+      {
+        "id": "sample-checklist-route",
+        "author": "小周",
+        "body": "我把「从筛选后的归档返回」也放进了每次发布前的检查。这个状态平时很容易漏。",
+        "parent": "",
+        "created": "2026-11-23T02:15:00Z",
+        "sample": true
+      },
+      {
+        "id": "sample-checklist-route-reply",
+        "author": "阿简",
+        "body": "再补一条在 `390px` 宽度点目录，确认标题没有被顶部导航挡住。",
+        "parent": "sample-checklist-route",
+        "created": "2026-11-23T03:22:00Z",
+        "sample": true
+      }
+    ],
     "working-with-coding-agents": [
       {
         "id": "sample-ai-scope",
