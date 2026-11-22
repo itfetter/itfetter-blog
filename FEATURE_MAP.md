@@ -6,7 +6,8 @@
 | --- | --- | --- |
 | 首页与主题入口 | `home()`、`topics`、`posts`、`notes`、`projects`，样式 `.hero`、`.feature`、`.home-grid` | 置顶链接、最近列表、主题文章数、窄屏重排 |
 | 样稿封面与评论 | `index.html` 的 `sampleCovers`、`cover()`，`assets/`，`server.py` 的静态文件映射，`content.js` 的 `comments` | 首页置顶与正文封面、示例标签、归档计数和楼中回复 |
-| 路由、导航与标题 | `render()`、`hashchange`、`.nav` | 从 URL 直接打开、浏览器返回、活动栏目、未知路由 |
+| 路由、导航与标题 | `render()`、`navigateToArticle()`、`hashchange`、`.nav` | 文章返回进入时的页面与筛选、恢复搜索、目录跳转后仍能返回入口、直达链接回退归档 |
+| 关于本站 | `about()`、`settings`、`.about-page`、`.about-links` | 作者介绍、后台 Markdown、GitHub 链接、推荐文章、移动端单列 |
 | 归档和筛选 | `archive()`、`row()`、`.filter-bar`、`.pill` | 年份分组、结果计数、重新筛选后的焦点 |
 | 文章阅读 | `article()`、`postLink()`、`updateProgress()`、`[data-copy]` | 目录定位、阅读进度、代码复制、表格横滚和相关页 |
 | 搜索弹层 | `#search`、`search()`、`openSearch()`、`openResult()`、`#query` 键盘处理 | `/` 或 `Ctrl/Cmd+K`、正文关键词、无结果恢复、方向键、Enter 与 Esc |
