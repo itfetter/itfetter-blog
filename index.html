@@ -26,16 +26,54 @@
     @media(max-width:750px){.wrap{width:calc(100% - 40px)}.hero{gap:24px;padding-block:39px 34px}.hero-art{min-height:222px}.terminal{width:81%}.hero h1{font-size:clamp(2.1rem,6vw,3.1rem)}.cards{gap:10px}.card-body{padding:12px}.nav{gap:13px}.header-inner{gap:12px}.search-button span:not(.lens),.search-button kbd{display:none}.search-button{justify-content:center}.cover{height:92px}}
     @media(max-width:560px){.wrap{width:calc(100% - 32px)}.header-inner{flex-wrap:wrap;gap:0;min-height:0;padding-top:9px}.nav{order:3;width:100%;gap:24px;margin-top:1px}.nav a{display:inline-flex;align-items:center;min-height:43px}.hero{grid-template-columns:1fr;padding-block:31px 29px;gap:23px}.hero-art{min-height:210px}.terminal{width:min(75%,280px);font-size:.75rem}.hero p{font-size:.9375rem}.actions{margin-top:17px}.cards{grid-template-columns:1fr;gap:13px}.card{display:grid;grid-template-columns:86px minmax(0,1fr)}.cover{height:auto;min-height:100%;font-size:.67rem}.cover>span{padding:5px;box-shadow:3px 3px 0 #0003}.card h3{font-size:1rem}.row{grid-template-columns:1fr auto;gap:3px 8px}.row time{grid-column:1/-1}.page-intro{padding-top:32px}.footer-inner{flex-wrap:wrap;padding-block:12px}.section-head{align-items:start}.reading{padding-top:26px}}
     main:focus{outline:none}
+    .header{position:sticky;top:0;z-index:5;background:var(--bg)}
+    .progress{position:fixed;top:0;left:0;height:2px;width:0;background:var(--accent);z-index:6;pointer-events:none}
+    .hero{padding-block:43px 37px}
+    .hero-art{min-height:225px}
+    .hero h1{font-size:clamp(2.15rem,4vw,3rem)}
+    .hero h1 .hero-name{white-space:nowrap}
+    .cover{height:84px}
+    .now{display:block;margin-top:15px;color:var(--muted);font-size:.875rem}
+    .now a,.section-head a{color:var(--accent)}
+    .studio-link{display:inline-flex;align-items:center;min-height:42px;white-space:nowrap;padding:0 9px;font-size:.875rem}
+    .row small{display:block;color:var(--muted);font-size:.875rem;margin-top:2px}
+    .index-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .index-card{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:16px 18px;min-width:0}
+    .index-card h3{font-size:1.05rem;margin:4px 0}.index-card p{color:var(--muted);font-size:.9rem;margin:0 0 9px}
+    .index-card a,.index-card summary{color:var(--accent);font-size:.9rem}.index-card summary{cursor:pointer;padding-block:5px}
+    .article-grid{display:grid;grid-template-columns:minmax(0,720px) minmax(0,1fr);gap:32px}
+    .article-grid .reading{width:100%;margin:0}.article-grid .toc{align-self:start;position:sticky;top:95px;margin-top:70px}
+    .article-grid .toc-inline{display:none}
+    .reading h2{scroll-margin-top:90px}.reading h3{margin:20px 0 8px}
+    .code-panel{border:1px solid var(--line);border-radius:9px;background:var(--surface);overflow:hidden;margin:12px 0 22px}
+    .code-bar{border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:5px 12px}
+    .code-bar button{border:0;border-radius:5px;background:transparent;padding:5px 9px;color:var(--accent);min-height:35px}
+    .code-bar button:hover{background:var(--soft)}.code-panel pre{border:0;margin:0;border-radius:0}
+    .table-scroll{overflow:auto;margin:10px 0 20px}.table-scroll table{width:100%;border-collapse:collapse;font-size:.9rem}
+    .table-scroll caption{text-align:left;margin-bottom:6px;color:var(--muted)}
+    .table-scroll th,.table-scroll td{text-align:left;border-bottom:1px solid var(--line);padding:9px 10px}
+    .table-scroll thead{background:var(--soft)}
+    .studio-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+    .studio-pane{min-width:0;border:1px solid var(--line);border-radius:10px;padding:15px;background:var(--surface)}
+    .studio-pane h2,.studio-pane label{display:block;font-size:1rem;font-weight:700;margin-bottom:8px}
+    .studio-pane textarea{width:100%;min-height:320px;resize:vertical;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);padding:10px;font:.9rem/1.7 var(--mono)}
+    .studio-preview{overflow-wrap:anywhere}.studio-preview pre{overflow:auto;background:var(--bg);padding:10px}.studio-preview p,.studio-preview ul{margin:8px 0}
+    .studio-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:14px 0}.studio-actions .primary{border:0}.studio-actions button:disabled{opacity:.55}
+    @media(max-width:810px){.article-grid{display:block}.article-grid>.toc{display:none}.article-grid .toc-inline{display:block;position:static;margin:15px 0 20px}.header-inner{gap:10px}.nav{gap:11px}}
+    @media(max-width:650px){.header-inner{flex-wrap:wrap;gap:0;padding-top:7px}.nav{order:3;width:100%;gap:18px}.nav a{min-height:42px}.studio-grid{grid-template-columns:1fr}.reading h2{scroll-margin-top:115px}}
+    @media(max-width:560px){.hero{padding-block:28px}.hero-art{min-height:174px}.index-grid{grid-template-columns:1fr}.cover{height:auto}}
     @media(prefers-reduced-motion:reduce){*{transition:none!important}}
   </style>
 </head>
 <body>
   <a class="skip" href="#main">跳到正文</a>
+  <div class="progress" id="progress" aria-hidden="true"></div>
   <header class="header">
     <div class="wrap header-inner">
       <a class="brand" href="#home"><span class="mark" aria-hidden="true">&gt;_</span>itfetter</a>
-      <nav class="nav" aria-label="主导航"><a href="#home">首页</a><a href="#archive">文章</a><a href="#about">关于</a></nav>
+      <nav class="nav" aria-label="主导航"><a href="#home">首页</a><a href="#archive">文章</a><a href="#notes">笔记</a><a href="#projects">项目</a><a href="#about">关于</a></nav>
       <div class="tools">
+        <a class="studio-link" href="#studio">写作台</a>
         <button class="icon search-button" id="open-search" aria-label="搜索文章"><span class="lens" aria-hidden="true"></span><span>搜索</span><kbd aria-hidden="true">/</kbd></button>
         <button class="icon" id="theme" aria-label="切换配色"></button>
       </div>
@@ -53,7 +91,8 @@
       {id:'working-with-coding-agents', topic:'ai', date:'2026-11-18', featured:'agent.run()', title:'把 AI 编程接进日常之后', summary:'从理解项目到审查提交，一套可以反复用的协作流程。', sections:[
         ['先约定交付长什么样','同样是「修一下列表」，可能指移动端溢出，也可能指排序结果不对。发任务前，写下从哪里进入、操作到哪一步、预期看到什么。验收描述越具体，后面越容易判断改动是否跑偏。'],
         ['把理解和修改拆开','先让工具定位入口和已有的验证命令，再动手改一件事。读提交时从用户入口开始，沿着数据走到最终状态，确认每一步仍符合现有行为。'],
-        ['留一份能接力的记录','结束时记下这次跑过的命令、手动试过的步骤，以及仍需确认的地方。隔几天回看时，这几行比整段对话更容易用。','已验证：空列表、长标题、移动端折行\n待确认：生产数据下的分页表现'] ]},
+        ['留一份能接力的记录','结束时记下这次跑过的命令、手动试过的步骤，以及仍需确认的地方。隔几天回看时，这几行比整段对话更容易用。','已验证：空列表、长标题、移动端折行\n待确认：生产数据下的分页表现'],
+        ['用验收表比较两次尝试','下面用一个文章列表展示如何逐项核对结果。每项都写成能重做的操作，方便检查提示词的变化到底解决了什么。'] ]},
       {id:'small-tool-first-release', topic:'dev', date:'2026-11-12', featured:'git push', title:'一个小工具的第一个可用版本', summary:'先做通最常用的一条路径，再决定哪些想法值得继续做。', sections:[
         ['从手工做过的任务开始','拿三条真实记录跑一遍原来的流程。先记下最耗时的那一步，例如每周重复把一组链接整理成可发给同事的清单。它就是首版要解决的问题。'],
         ['让失败也有下一步','粘贴内容里混有空行时可以照常整理。遇到无法识别的地址，直接指出具体是哪一行，让用户修改后继续。'],
@@ -67,6 +106,15 @@
       {id:'weekly-review',topic:'note',date:'2025-12-21',title:'周末项目的一次简单复盘',summary:'把下次打开仓库时最有用的三件事写下来。',sections:[['先记现在能做什么','打开项目，从使用者的视角把能做成的那件事完整走一遍。把入口、数据和关键操作写在同一处，给下一次工作留个起点。'],['给下次留一个可完成的任务','选一个两小时内能验证的改动，记录它解决的使用问题和验收步骤。下次从这里开始，会比重新规划整周容易。']]}
     ];
 
+    const notes = [
+      {kind:'写作方法', date:'2026-11-20', title:'把 AI 实测写成能重做的记录', text:'留住任务输入、验收步骤和失败示例。换一个工具时还能复用这份记录。', detail:'先固定一份输入，再各跑一次相同任务。把人工返工拆成补上下文、改实现和补验证，记录每一步的耗时。'},
+      {kind:'开发便笺', date:'2026-11-10', title:'空状态也跑一遍真实操作', text:'用空仓库、空文件和正常输入各试一次，看看页面是否说明了下一步。', detail:'用可执行的文案替换「暂无数据」。例如「还没有书签，粘贴一组链接开始整理」。'}
+    ];
+    const projects = [
+      {kind:'项目构想', title:'浏览器书签整理器', text:'把网址清单变成一份可以检查、去重和复制的分享列表。', post:'bookmark-export'},
+      {kind:'流程样例', title:'AI 协作验收清单', text:'记录变更范围、复核步骤和未验证事项，给下一轮开发留一个清楚的起点。', post:'working-with-coding-agents'}
+    ];
+
     const main = document.querySelector('main');
     const dialog = document.querySelector('#search');
     const query = document.querySelector('#query');
@@ -76,16 +124,25 @@
     const postLink = post => `#post/${post.id}`;
     const date = post => `<time datetime="${post.date}">${post.date.replaceAll('-', '.')}</time>`;
     const metadata = post => `<div class="meta"><span class="tag">${topics[post.topic]}</span>${date(post)}</div>`;
-    const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<strong>${post.title}</strong><span class="meta tag">${topics[post.topic]}</span></a></li>`;
+    const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<div><strong>${post.title}</strong><small>${post.summary}</small></div><span class="meta tag">${topics[post.topic]}</span></a></li>`;
+    const escapeHtml = value => value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+    const progress = document.querySelector('#progress');
+
+    function indexCards(items) {
+      return `<div class="index-grid">${items.map(item => `<article class="index-card"><div class="meta"><span class="tag">${item.kind}</span>${item.date ? date(item) : ''}</div><h3>${item.title}</h3><p>${item.text}</p>${item.post ? `<a href="#post/${item.post}">阅读相关手记</a>` : `<details><summary>展开笔记</summary><p>${item.detail}</p></details>`}</article>`).join('')}</div>`;
+    }
 
     function home() {
       return `<section class="hero" aria-labelledby="welcome"><div><div class="eyebrow mono">ITFETTER / 开发手记</div>
-        <h1 id="welcome">写代码，也写下<br><span>做东西的过程。</span></h1>
-        <p>这里记录个人项目是怎么做出来的，AI 工具用起来怎么样，以及开发途中值得留一笔的小发现。</p>
-        <div class="actions"><a class="primary" href="#archive">浏览文章</a><a class="quiet" href="#about">关于这个博客</a></div></div>
+        <h1 id="welcome">你好，我是 <span class="hero-name">itfetter</span></h1>
+        <p>我在这里记录个人项目是怎么做出来的，AI 工具用起来怎么样，还有开发途中值得留一笔的小发现。</p>
+        <div class="actions"><a class="primary" href="#archive">浏览文章</a><a class="quiet" href="#projects">看看项目</a></div>
+        <span class="now">最近一篇 · <a href="${postLink(posts[0])}">${posts[0].title}</a></span></div>
         <div class="hero-art" aria-hidden="true"><div class="paper"></div><div class="terminal"><div class="terminal-bar"><i></i><i></i><i></i><span>~/workbench</span></div><div class="terminal-code"><b>$</b> git status --short<br><em> M</em> projects/side-project<br><em>??</em> notes/ai-workflow.md<br><b>$</b> <span>▌</span></div></div><span class="art-label">THE WORKBENCH</span></div></section>
-        <section class="section"><div class="section-head"><div><h2>精选文章</h2><p>从这三篇认识这个博客</p></div><a href="#archive">全部文章</a></div><div class="cards">${posts.filter(post => post.featured).map(post => `<a class="card" href="${postLink(post)}"><div aria-hidden="true" class="cover ${post.topic}"><span>${post.featured}</span></div><div class="card-body">${metadata(post)}<h3>${post.title}</h3><p>${post.summary}</p></div></a>`).join('')}</div></section>
-        <section class="section"><div class="section-head"><h2>最近更新</h2><span class="subtle">原型样稿</span></div><ul class="rows">${posts.slice(0,4).map(row).join('')}</ul></section>`;
+        <section class="section"><div class="section-head"><h2>精选文章</h2><a href="#archive">全部文章</a></div><div class="cards">${posts.filter(post => post.featured).map(post => `<a class="card" href="${postLink(post)}"><div aria-hidden="true" class="cover ${post.topic}"><span>${post.featured}</span></div><div class="card-body">${metadata(post)}<h3>${post.title}</h3><p>${post.summary}</p></div></a>`).join('')}</div></section>
+        <section class="section"><div class="section-head"><h2>最近更新</h2><span class="subtle">原型样稿</span></div><ul class="rows">${posts.slice(0,3).map(row).join('')}</ul></section>
+        <section class="section"><div class="section-head"><h2>开发笔记</h2><a href="#notes">全部笔记</a></div>${indexCards(notes)}</section>
+        <section class="section"><div class="section-head"><h2>项目与实验</h2><a href="#projects">全部项目</a></div>${indexCards(projects)}</section>`;
     }
 
     function archive(topic) {
@@ -99,10 +156,63 @@
 
     function article(post) {
       const related = posts.find(item => item.topic === post.topic && item !== post);
-      return `<article class="reading"><a class="back" href="#archive">返回文章归档</a>${metadata(post)}<h1>${post.title}</h1><p class="lede">${post.summary}</p><p class="subtle">原型样稿</p>
-        <nav class="toc" aria-label="本文目录"><strong>本文目录</strong><ol>${post.sections.map(([heading], i) => `<li><a href="${postLink(post)}/${i + 1}">${heading}</a></li>`).join('')}</ol></nav>
-        ${post.sections.map(([heading, body, code], i) => `<section><h2 id="section-${i + 1}" tabindex="-1">${heading}</h2><p>${body}</p>${code ? `<pre><code>${code}</code></pre>` : ''}</section>`).join('')}
-        ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${related.title}</a></div>` : ''}</article>`;
+      const links = post.sections.map(([heading], i) => `<li><a href="${postLink(post)}/${i + 1}">${heading}</a></li>`).join('');
+      return `<div class="article-grid"><article class="reading"><a class="back" href="#archive">返回文章归档</a>${metadata(post)}<h1>${post.title}</h1><p class="lede">${post.summary}</p><p class="subtle">原型样稿</p>
+        <nav class="toc toc-inline" aria-label="本文目录"><strong>本文目录</strong><ol>${links}</ol></nav>
+        <div id="article-body">${post.sections.map(([heading, body, code], i) => `<section><h2 id="section-${i + 1}" tabindex="-1">${heading}</h2><p>${body}</p>${code ? `<div class="code-panel"><div class="code-bar"><span class="subtle mono">验收记录</span><button type="button" data-copy>复制</button></div><pre><code>${escapeHtml(code)}</code></pre></div>` : ''}</section>`).join('')}
+        ${post === posts[0] ? '<div class="table-scroll" tabindex="0"><table><caption>文章列表验收示例</caption><thead><tr><th scope="col">检查项</th><th scope="col">怎么验证</th><th scope="col">期望结果</th></tr></thead><tbody><tr><th scope="row">空列表</th><td>筛选无匹配内容</td><td>提示可以换一个主题</td></tr><tr><th scope="row">长标题</th><td>在手机宽度阅读两行以上标题</td><td>日期和标题清晰对齐</td></tr><tr><th scope="row">分页</th><td>筛选后切换到下一页</td><td>主题条件继续生效</td></tr></tbody></table></div>' : ''}</div>
+        ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${related.title}</a></div>` : ''}</article>
+        <nav class="toc" aria-label="本文目录"><strong>本文目录</strong><ol>${links}</ol></nav></div>`;
+    }
+
+    function markdownPreview(markdown) {
+      return markdown.trim().split(/(^```[^\n]*\n[\s\S]*?\n```[ \t]*$)/m).map((part, index) => {
+        if (index % 2) return `<pre><code>${escapeHtml(part.slice(part.indexOf('\n') + 1, part.lastIndexOf('\n')))}</code></pre>`;
+        return escapeHtml(part).replace(/^(#{1,3} .+)$/gm,'\n$1\n').trim().split(/\n\s*\n/).filter(Boolean).map(block => {
+          const heading = block.match(/^(#{1,3}) (.+)$/);
+          if (heading) {
+            const level = heading[1].length + 2;
+            return `<h${level}>${heading[2]}</h${level}>`;
+          }
+          const lines = block.split('\n');
+          if (lines.every(line => /^[-*] /.test(line))) return `<ul>${lines.map(line => `<li>${line.slice(2)}</li>`).join('')}</ul>`;
+          return `<p>${block.replaceAll('\n','<br>')}</p>`;
+        }).join('');
+      }).join('');
+    }
+
+    function setupStudio() {
+      const draft = document.querySelector('#draft');
+      const preview = document.querySelector('#draft-preview');
+      const status = document.querySelector('#draft-status');
+      const download = document.querySelector('#export-draft');
+      try { draft.value = localStorage.getItem('itfetter-draft') || ''; } catch {}
+      function refreshPreview() {
+        preview.innerHTML = markdownPreview(draft.value) || '<p class="subtle">开始写作后，这里会显示预览。</p>';
+        download.disabled = !draft.value.trim();
+      }
+      draft.addEventListener('input', () => {
+        try {
+          localStorage.setItem('itfetter-draft', draft.value);
+          status.textContent = '草稿已保存到当前浏览器';
+        } catch { status.textContent = '浏览器未能保存草稿，可以先导出 Markdown。'; }
+        refreshPreview();
+      });
+      download.addEventListener('click', () => {
+        const url = URL.createObjectURL(new Blob([draft.value], {type:'text/markdown;charset=utf-8'}));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'itfetter-draft.md';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      });
+      refreshPreview();
+    }
+
+    function updateProgress() {
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      const active = main.querySelector('.article-grid') && scrollable > 0;
+      progress.style.width = `${active ? Math.min(100, Math.max(0, window.scrollY / scrollable * 100)) : 0}%`;
     }
 
     function render() {
@@ -113,10 +223,16 @@
         if (link.hash === `#${current}`) link.setAttribute('aria-current','page');
         else link.removeAttribute('aria-current');
       });
-      document.title = `${post ? post.title : ({archive:'文章归档',about:'关于本站'})[page] || '开发手记'} · itfetter`;
+      document.title = `${post ? post.title : ({archive:'文章归档',notes:'开发笔记',projects:'项目与实验',studio:'写作台',about:'关于本站'})[page] || '开发手记'} · itfetter`;
       if (page === 'home') main.innerHTML = home();
       else if (page === 'archive') main.innerHTML = archive(key);
       else if (post) main.innerHTML = article(post);
+      else if (page === 'notes') main.innerHTML = `<div class="page-intro"><h1>开发笔记</h1><p>短一些的观察、做法和踩坑记录。以下为原型样稿。</p></div>${indexCards(notes)}`;
+      else if (page === 'projects') main.innerHTML = `<div class="page-intro"><h1>项目与实验</h1><p>小工具的构想，以及做东西时可以复用的流程样例。</p></div>${indexCards(projects)}`;
+      else if (page === 'studio') {
+        main.innerHTML = `<div class="page-intro"><h1>写作台</h1><p>草稿保存在当前浏览器，写完可以导出为 Markdown 文件。</p></div><div class="studio-grid"><div class="studio-pane"><label for="draft">Markdown 草稿</label><textarea id="draft" placeholder="## 写下要解决的问题" aria-describedby="draft-help"></textarea><p class="subtle" id="draft-help">预览支持标题、段落、列表和围栏代码块。</p></div><section class="studio-pane studio-preview" aria-labelledby="draft-view-title"><h2 id="draft-view-title">实时预览</h2><div id="draft-preview"></div></section></div><div class="studio-actions"><button class="primary" id="export-draft" type="button">导出 Markdown</button><span class="subtle" id="draft-status" role="status"></span></div>`;
+        setupStudio();
+      }
       else if (page === 'about') main.innerHTML = `<article class="reading"><h1>关于这个博客</h1><p class="lede">itfetter 的个人开发手记。</p><p>这里会写自己动手做的小项目、日常和 AI 一起工作的体验，以及后来想翻回来看一眼的技术笔记。项目是怎么开始的、工具在哪一步帮了忙、做完后想改哪里，都是值得记下的内容。</p><h2>从哪里开始读</h2><p>可以去 <a class="prose-link" href="#archive">文章归档</a> 按主题找感兴趣的样稿，也可以去 <a class="prose-link" href="https://github.com/itfetter">GitHub</a> 看项目。</p></article>`;
       else main.innerHTML = '<div class="page-intro"><h1>没有找到这个页面</h1><a class="quiet" href="#archive">浏览文章归档</a></div>';
       const heading = post && section && document.getElementById(`section-${section}`);
@@ -127,6 +243,7 @@
         main.focus({preventScroll:true});
         window.scrollTo(0,0);
       }
+      updateProgress();
     }
 
     function search() {
@@ -177,6 +294,16 @@
       event.preventDefault();
       main.focus();
     });
+    main.addEventListener('click', async event => {
+      const copy = event.target.closest('[data-copy]');
+      if (!copy) return;
+      try {
+        await navigator.clipboard.writeText(copy.closest('.code-panel').querySelector('code').textContent);
+        copy.textContent = '已复制';
+      } catch { copy.textContent = '请手动复制'; }
+    });
+    window.addEventListener('scroll', updateProgress, {passive:true});
+    window.addEventListener('resize', updateProgress);
     window.addEventListener('hashchange', render);
     updateThemeButton();
     render();
