@@ -115,7 +115,7 @@
     refresh();
   }
 
-  async function save(change, message, form) {
+  async function save(change, message, form, automatic = false) {
     if (busy) return;
     busy = true;
     const keepEditing = form && change.collection === 'posts' && change.item?.status === 'draft';
@@ -123,7 +123,13 @@
     if (keepEditing) dirty = false;
     const buttons = form ? [...form.querySelectorAll('button[type=submit],#withdraw-post')] : [];
     buttons.forEach(button => { button.disabled = true; });
-    notify('正在保存…');
+    const draftStatus = keepEditing && form.querySelector('.draft-save-status');
+    const report = (text, error = false) => {
+      if (!draftStatus) return notify(text,error);
+      draftStatus.textContent = text;
+      draftStatus.dataset.error = String(error);
+    };
+    report(automatic ? '正在自动保存…' : '正在保存…');
     try {
       data = await api(change);
       if (keepEditing) {
@@ -136,19 +142,19 @@
         dirty = false;
         render();
       }
-      notify(message);
+      report(keepEditing && dirty ? '有未保存的更改…' : message);
     } catch (error) {
       if (keepEditing) dirty ||= wasDirty;
-      notify(error.message, true);
+      report(automatic ? `自动保存失败。${error.message} 可点击「保存草稿」重试。` : error.message,true);
     } finally {
       busy = false;
       buttons.forEach(button => { button.disabled = false; });
     }
   }
 
-  function trackForm(form) {
-    form.addEventListener('input', () => { dirty = true; });
-    form.addEventListener('change', () => { dirty = true; });
+  function trackForm(form, onChange = () => { dirty = true; }) {
+    form.addEventListener('input',onChange);
+    form.addEventListener('change',onChange);
   }
 
   function openEditor(entry = {}) {
@@ -164,13 +170,46 @@
     const articleOptions = [['','无关联'],...data.posts.map(post => [post.id,post.title])];
     const fields = isPost ? `${select('topic','文章主题',Object.entries(data.topics),item.topic || Object.keys(data.topics)[0])}${date}` : `${kind}${collection === 'notes' ? date : select('post','关联文章',articleOptions,item.post || '')}${status}`;
     const details = `${textarea('text','简短说明',item.text,350)}${collection === 'notes' ? textarea('detail','笔记正文',item.detail,8000,false) : input('url','项目链接',item.url,300,'url',false)}`;
-    const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}</details></div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
+    const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<p class="draft-save-status subtle" role="status">${item.status === 'draft' ? '草稿已保存。' : '编辑后自动保存草稿。'}</p><details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}</details></div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
     const actions = isPost ? `<p class="subtle">${published ? '保存草稿后，读者仍看到已发布版本。' : '发布后，文章会出现在博客上。'}</p><button type="submit" class="secondary" name="status" value="draft">保存草稿</button><button type="submit" class="primary" name="status" value="published">${published ? '发布更新' : '发布文章'}</button>` : `<button type="submit" class="primary">保存${labels[collection]}</button>`;
     page.innerHTML = `<div class="admin-page-head"><div><button type="button" class="admin-back" id="return-list">返回${labels[collection]}列表</button><h2>${item.id ? '编辑' : '新建'}${labels[collection]}</h2></div>${published ? '<button type="button" class="secondary" id="withdraw-post">撤回发布</button>' : ''}</div>
       <form id="content-form" class="admin-editor"><div class="admin-card ${isPost ? 'document-card' : ''}">${editorFields}</div><div class="admin-save">${actions}</div></form>`;
     const form = page.querySelector('form');
-    const editor = isPost ? articleEditor(form.querySelector('#article-editor'), item) : null;
-    trackForm(form);
+    const draftStatus = form.querySelector('.draft-save-status');
+    let saveTimer;
+    function scheduleDraft() {
+      dirty = true;
+      clearTimeout(saveTimer);
+      draftStatus.dataset.error = 'false';
+      draftStatus.textContent = '有未保存的更改…';
+      saveTimer = setTimeout(saveDraftWhenReady,1200);
+    }
+    const editor = isPost ? articleEditor(form.querySelector('#article-editor'), item, scheduleDraft) : null;
+    if (isPost) {
+      trackForm(form,event => {
+        if (!event.target.closest('#article-editor')) scheduleDraft();
+      });
+    } else trackForm(form);
+
+    function submitContent(status, automatic = false) {
+      const fields = Object.fromEntries(new FormData(form));
+      if (editor) {
+        fields.body = editor();
+        fields.status = status;
+      }
+      save({collection,id:form.dataset.postId || entry.id || '',item:fields}, fields.status === 'published' ? '已发布到博客。' : automatic ? '草稿已自动保存。' : '草稿已保存。', form, automatic);
+    }
+
+    function saveDraftWhenReady() {
+      if (!form.isConnected || !dirty) return;
+      if (busy) {
+        saveTimer = setTimeout(saveDraftWhenReady,1200);
+      } else if (!form.elements.title.value.trim()) {
+        draftStatus.textContent = '填写标题后自动保存。';
+      } else if (form.matches(':invalid')) {
+        draftStatus.textContent = '填写有效的发布设置后自动保存。';
+      } else submitContent('draft',true);
+    }
     form.addEventListener('invalid', event => {
       const settings = event.target.closest('.publication-settings');
       if (settings) settings.open = true;
@@ -183,12 +222,8 @@
     });
     form.addEventListener('submit', event => {
       event.preventDefault();
-      const fields = Object.fromEntries(new FormData(form));
-      if (editor) {
-        fields.body = editor();
-        fields.status = event.submitter?.value || 'draft';
-      }
-      save({collection,id:form.dataset.postId || entry.id || '',item:fields}, fields.status === 'published' ? '已发布到博客。' : '草稿已保存。', form);
+      clearTimeout(saveTimer);
+      submitContent(event.submitter?.value || 'draft');
     });
     form.querySelector('[name=title]').focus();
   }
@@ -214,7 +249,7 @@
     });
   }
 
-  function articleEditor(root, item) {
+  function articleEditor(root, item, onEdit) {
     let markdown = item.body || '';
     let mode = 'document';
     let activeRange = null;
@@ -273,7 +308,7 @@
     function sync() {
       markdown = markdownSource(readDocument(documentEditor));
       exportButton.disabled = !markdown.trim();
-      dirty = true;
+      onEdit();
     }
 
     function selectRange(range) {
@@ -350,7 +385,7 @@
       }
       markdown = state.markdown;
       exportButton.disabled = !markdown.trim();
-      dirty = true;
+      onEdit();
       trackSelection();
     }
 
@@ -487,7 +522,7 @@
         if (markdown.trim() && !window.confirm('用原浏览器草稿替换当前正文？')) return;
         if (documentEditor) savedDocument = snapshot();
         markdown = legacy;
-        dirty = true;
+        onEdit();
         paint();
       } else if ('export' in button.dataset) {
         download(`${item.id || 'itfetter-draft'}.md`,markdown,'text/markdown;charset=utf-8');
@@ -519,7 +554,7 @@
       if (mode === 'source') {
         markdown = event.target.value;
         exportButton.disabled = !markdown.trim();
-        dirty = true;
+        onEdit();
       } else if (!applyingEdit && !composing && documentEditor?.contains(event.target)) {
         sync();
         trackSelection();

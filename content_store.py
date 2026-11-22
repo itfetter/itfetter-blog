@@ -21,6 +21,9 @@ def public_script(data):
     public = {"topics": data["topics"], "settings": data["settings"]}
     for collection in COLLECTIONS:
         public[collection] = [{key: value for key, value in item.items() if key != "draft"} for item in data[collection] if item["status"] == "published"]
+    comments = data.get("comments", {})
+    for post in public["posts"]:
+        post["commentCount"] = len(comments.get(post["id"], []))
     return "window.blogContent = " + json.dumps(public, ensure_ascii=False) + ";\n"
 
 

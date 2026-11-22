@@ -61,7 +61,8 @@
     const postLink = post => `#post/${post.id}`;
     const date = post => `<time datetime="${post.date}">${post.date.replaceAll('-', '.')}</time>`;
     const metadata = post => `<div class="meta"><span class="tag">${topics[post.topic]}</span>${date(post)}</div>`;
-    const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<div><strong>${escapeHtml(post.title)}</strong><small>${escapeHtml(post.summary)}</small></div><span class="meta tag">${topics[post.topic]}</span></a></li>`;
+    const commentLabel = post => `${post.commentCount ?? 0} 条评论`;
+    const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<div class="row-content"><strong>${escapeHtml(post.title)}</strong><small>${escapeHtml(post.summary)}</small></div><span class="row-meta"><span class="tag">${topics[post.topic]}</span><span class="comment-count">${commentLabel(post)}</span></span></a></li>`;
     const progress = document.querySelector('#progress');
     let currentPage = '';
     let currentPost = '';
@@ -101,17 +102,20 @@
       const related = posts.find(item => item.topic === post.topic && item !== post);
       const blocks = markdownBlocks(post.body);
       const links = blocks.filter(block => /^h[1-6]$/.test(block.type)).map((block, i) => `<li><a href="${postLink(post)}/${i + 1}">${escapeHtml(block.text)}</a></li>`).join('');
-      const toc = cssClass => links ? `<nav class="toc ${cssClass}" aria-label="本文目录"><strong>本文目录</strong><ol>${links}</ol></nav>` : '';
-      return `<div class="article-grid"><article class="reading"><a class="back" href="#archive">返回文章归档</a>${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p><p class="meta">${post.sample ? '<span>原型样稿</span>' : ''}<a class="prose-link" href="${postLink(post)}/comments">查看评论</a></p>
+      const discussion = `<a class="toc-comments" href="${postLink(post)}/comments"><span>讨论与评论</span><span class="comment-count" data-comment-count>${commentLabel(post)}</span></a>`;
+      const toc = cssClass => `<nav class="toc ${cssClass}" aria-label="本文目录"><strong>本文目录</strong>${links ? `<ol>${links}</ol>` : ''}${discussion}</nav>`;
+      return `<div class="article-grid"><article class="reading"><a class="back" href="#archive">返回文章归档</a>${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p>${post.sample ? '<p class="meta">原型样稿</p>' : ''}
         ${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}
         ${post.id === 'working-with-coding-agents' && post.sample ? '<div class="table-scroll" tabindex="0"><table><caption>文章列表验收示例</caption><thead><tr><th scope="col">检查项</th><th scope="col">怎么验证</th><th scope="col">期望结果</th></tr></thead><tbody><tr><th scope="row">空列表</th><td>筛选无匹配内容</td><td>提示可以换一个主题</td></tr><tr><th scope="row">长标题</th><td>在手机宽度阅读两行以上标题</td><td>日期和标题清晰对齐</td></tr><tr><th scope="row">分页</th><td>筛选后切换到下一页</td><td>主题条件继续生效</td></tr></tbody></table></div>' : ''}</div>
         ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}
-        <section class="article-comments" aria-labelledby="section-comments"><h2 id="section-comments" tabindex="-1">讨论与评论</h2><div class="comment-list"></div><p class="comment-feedback" role="status">正在加载评论…</p><button type="button" class="secondary comment-retry" hidden>重新加载</button>
-        <form class="comment-form" hidden><label>昵称<input name="author" maxlength="40" autocomplete="nickname" required></label><div class="comment-reply" hidden><span></span><button type="button" class="secondary">取消回复</button></div><label>评论<textarea name="body" rows="4" maxlength="2000" required></textarea></label><button type="submit" class="primary">发表评论</button></form></section></article>${toc('')}</div>`;
+        <section class="article-comments" aria-labelledby="section-comments"><div class="discussion-heading"><h2 id="section-comments" tabindex="-1">讨论与评论</h2><span class="comment-count" data-comment-count>${commentLabel(post)}</span></div>
+        <form class="comment-form" hidden><label>昵称<input name="author" maxlength="40" autocomplete="nickname" required></label><div class="comment-reply" hidden><span></span><button type="button" class="secondary">取消回复</button></div><label>评论<textarea name="body" rows="4" maxlength="2000" required placeholder="分享你的实践经验，或提一个问题"></textarea></label><div class="comment-form-actions"><small>支持行内代码 · Ctrl / ⌘ + Enter 发布</small><button type="submit" class="primary">发表评论</button></div></form>
+        <p class="comment-feedback" role="status">正在加载评论…</p><button type="button" class="secondary comment-retry" hidden>重新加载</button><div class="comment-list"></div></section></article>${toc('')}</div>`;
     }
 
     function mountComments(post) {
       const section = main.querySelector('.article-comments');
+      const counts = section.closest('.article-grid').querySelectorAll('[data-comment-count]');
       const endpoint = `./api/comments?post=${encodeURIComponent(post.id)}`;
       const form = section.querySelector('form');
       const list = section.querySelector('.comment-list');
@@ -125,9 +129,25 @@
 
       function display(items) {
         comments = items;
-        const renderComment = item => `<article class="comment"><header><strong>${escapeHtml(item.author)}</strong><time datetime="${escapeHtml(item.created)}">${dates.format(new Date(item.created))}</time></header><p>${escapeHtml(item.body)}</p>${item.parent ? '' : `<button type="button" class="comment-reply-button" data-reply="${item.id}">回复<span class="sr-only"> ${escapeHtml(item.author)}</span></button>`}</article>`;
-        list.innerHTML = items.length ? items.filter(item => !item.parent).map(item => `<div class="comment-thread">${renderComment(item)}${items.some(child => child.parent === item.id) ? `<div class="comment-children">${items.filter(child => child.parent === item.id).map(renderComment).join('')}</div>` : ''}</div>`).join('') : '<p class="subtle">还没有评论。欢迎分享你的想法。</p>';
-        section.querySelector('h2').textContent = `讨论与评论（${items.length}）`;
+        const replies = new Map();
+        const threads = [];
+        for (const item of items) {
+          if (!item.parent) threads.push(item);
+          else {
+            if (!replies.has(item.parent)) replies.set(item.parent, []);
+            replies.get(item.parent).push(item);
+          }
+        }
+        const renderComment = item => {
+          const body = escapeHtml(item.body).replace(/\x60([^\x60\n]+)\x60/g, '<code>$1</code>');
+          return `<article class="comment"><span class="comment-avatar" aria-hidden="true">${escapeHtml([...item.author][0] || '')}</span><div class="comment-content"><header><strong>${escapeHtml(item.author)}</strong><time datetime="${escapeHtml(item.created)}">${dates.format(new Date(item.created))}</time></header><p>${body}</p>${item.parent ? '' : `<button type="button" class="comment-reply-button" data-reply="${item.id}">回复<span class="sr-only"> ${escapeHtml(item.author)}</span></button>`}</div></article>`;
+        };
+        list.innerHTML = threads.length ? threads.map(item => {
+          const children = replies.get(item.id);
+          return `<div class="comment-thread">${renderComment(item)}${children ? `<div class="comment-children">${children.map(renderComment).join('')}</div>` : ''}</div>`;
+        }).join('') : '<p class="comment-empty">还没有评论，欢迎留下第一条。</p>';
+        post.commentCount = items.length;
+        counts.forEach(count => { count.textContent = commentLabel(post); });
       }
 
       function setReply(item) {
@@ -161,8 +181,15 @@
           form.elements.body.focus();
         }
       });
+      form.elements.body.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {
+          event.preventDefault();
+          if (!submit.disabled) form.requestSubmit();
+        }
+      });
       form.addEventListener('submit', async event => {
         event.preventDefault();
+        if (submit.disabled) return;
         const body = {...Object.fromEntries(new FormData(form)),parent};
         submit.disabled = true;
         status.textContent = '正在发布…';
