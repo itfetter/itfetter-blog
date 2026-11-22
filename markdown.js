@@ -29,17 +29,17 @@
         body.push(pattern ? next.replace(pattern,'') : next);
         i++;
       }
-      result.push({type,text:body.join('\n')});
+      result.push({type,text:body.join('\n'),...(type === 'ol' ? {start:Number.parseInt(marker[1],10)} : {})});
     }
     return result;
   }
 
   function source(blocks) {
-    return blocks.filter(block => block.text.trim()).map(({type,text,language}) => {
+    return blocks.filter(block => block.text.trim()).map(({type,text,language,start = 1}) => {
       if (type === 'code') return `\`\`\`${language || ''}\n${text}\n\`\`\``;
       if (/^h[1-6]$/.test(type)) return `${'#'.repeat(Number(type[1]))} ${text}`;
       if (type === 'quote' || type === 'ul' || type === 'ol') {
-        return text.split('\n').map((line, i) => `${type === 'quote' ? '> ' : type === 'ul' ? '- ' : (i + 1) + '. '}${line}`).join('\n');
+        return text.split('\n').map((line, i) => `${type === 'quote' ? '> ' : type === 'ul' ? '- ' : (i + start) + '. '}${line}`).join('\n');
       }
       return text;
     }).join('\n\n');
@@ -64,12 +64,12 @@
       if (node.matches('b,strong') || /^(bold|[6-9]00)$/.test(node.style.fontWeight)) return `**${text}**`;
       return text;
     };
-    function append(type, text, language, adjacent = false) {
+    function append(type, text, language, adjacent = false, start = 1) {
       text = type === 'code' ? text.replace(/\n$/,'') : text.trim();
       if (!text.trim()) return;
       const previous = result.at(-1);
       if (adjacent && previous?.type === type) previous.text += '\n' + text;
-      else result.push({type,text,language});
+      else result.push({type,text,language,...(type === 'ol' ? {start} : {})});
     }
     function visit(parent) {
       let run = '';
@@ -93,7 +93,7 @@
           const language = node.dataset.language || code.className.match?.(/(?:^|\s)language-([\w+-]+)/)?.[1] || '';
           append('code', lines.length ? lines.map(plain).join('\n') : plain(code),language);
         } else if (tag === 'ul' || tag === 'ol') {
-          append(tag,[...node.children].filter(child => child.localName === 'li').map(formatted).join('\n'));
+          append(tag,[...node.children].filter(child => child.localName === 'li').map(formatted).join('\n'),undefined,false,node.start);
         } else if (kind === 'ordered' || kind === 'bullet' || kind === 'unordered' || tag === 'li') {
           append(kind === 'ordered' ? 'ol' : 'ul',formatted(node.querySelector('.text-editor') || node),undefined,true);
         } else if (tag === 'blockquote' || kind === 'quote') {
@@ -124,7 +124,7 @@
 
   function render(blocks, article = false) {
     let headingIndex = 0;
-    return blocks.map(({type,text,language}) => {
+    return blocks.map(({type,text,language,start = 1}) => {
       if (/^h[1-6]$/.test(type)) {
         const tag = `h${article ? Math.max(2,Number(type[1])) : type[1]}`;
         const attrs = article ? ` id="section-${++headingIndex}" tabindex="-1"` : '';
@@ -134,7 +134,7 @@
         const code = `<pre${language ? ` data-language="${escape(language)}"` : ''}><code>${escape(text)}</code></pre>`;
         return article ? `<div class="code-panel"><div class="code-bar"><span class="subtle mono">${escape(language || '代码')}</span><button type="button" data-copy>复制</button></div>${code}</div>` : code;
       }
-      if (type === 'ul' || type === 'ol') return `<${type}>${text.split('\n').map(line => `<li>${inline(line)}</li>`).join('')}</${type}>`;
+      if (type === 'ul' || type === 'ol') return `<${type}${type === 'ol' && start !== 1 ? ` start="${start}"` : ''}>${text.split('\n').map(line => `<li>${inline(line)}</li>`).join('')}</${type}>`;
       const tag = type === 'quote' ? 'blockquote' : 'p';
       return `<${tag}>${inline(text).replaceAll('\n','<br>')}</${tag}>`;
     }).join('');

@@ -202,27 +202,39 @@
     const typeButtons = Object.entries(types).filter(([type]) => !/^h[4-6]$/.test(type)).map(([type,label]) => `<button type="button" data-type="${type}">${label}</button>`).join('');
     let documentEditor = null;
     let menu = null;
+    let menuBlock = null;
+    let hoverOpened = false;
 
-    function activeBlock() {
-      let node = activeRange?.startContainer;
+    function blockAt(node) {
       if (node?.nodeType === 3) node = node.parentElement;
-      if (!node || node === documentEditor || !documentEditor.contains(node)) return null;
+      if (!node || node === documentEditor || !documentEditor?.contains(node)) return null;
       const block = node.closest('li,pre,blockquote,h1,h2,h3,h4,h5,h6,p,div');
       return block === documentEditor ? null : block;
     }
 
-    function trackSelection() {
+    function positionMenu(block) {
+      if (menuBlock !== block) menuBlock?.classList.remove('block-menu-target');
+      menuBlock = block;
+      menu.hidden = !block;
+      if (!block) return;
+      menu.style.top = `${block.getBoundingClientRect().top - documentEditor.getBoundingClientRect().top}px`;
+      const type = ({li:block.parentElement.localName,pre:'code',blockquote:'quote'})[block.localName] || block.localName;
+      const glyph = ({p:'¶',div:'¶',ul:'•',ol:'1.',code:'‹›',quote:'“'})[type] || type.toUpperCase();
+      menu.querySelector('.block-type').textContent = glyph;
+      menu.querySelector('summary').setAttribute('aria-label',`当前块操作，${types[type] || '正文'}`);
+      menu.querySelector('[data-action=up]').disabled = !block.previousElementSibling;
+      menu.querySelector('[data-action=down]').disabled = !block.nextElementSibling;
+      menu.querySelector('[data-action=remove]').disabled = false;
+    }
+
+    function trackSelection(showHandle = true) {
       const selection = window.getSelection();
       if (!selection.rangeCount || !documentEditor?.contains(selection.anchorNode) || !documentEditor.contains(selection.focusNode)) return;
       activeRange = selection.getRangeAt(0).cloneRange();
-      const block = activeBlock();
-      if (block) {
-        menu.style.top = `${block.getBoundingClientRect().top - documentEditor.getBoundingClientRect().top}px`;
+      if (showHandle && !menu.open) {
+        const block = blockAt(activeRange.startContainer) || documentEditor.firstElementChild;
+        positionMenu(block);
       }
-      menu.querySelector('[data-action=up]').disabled = !block?.previousElementSibling;
-      menu.querySelector('[data-action=down]').disabled = !block?.nextElementSibling;
-      menu.querySelector('[data-action=remove]').disabled = !block;
-      menu.hidden = false;
     }
 
     function sync() {
@@ -250,6 +262,8 @@
       root.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.mode === mode)));
       exportButton.disabled = !markdown.trim();
       documentEditor = null;
+      menuBlock = null;
+      hoverOpened = false;
       activeRange = null;
       pasteHistory = null;
       if (mode === 'source') {
@@ -257,19 +271,28 @@
       } else if (mode === 'preview') {
         canvas.innerHTML = `<div class="editor-preview">${renderMarkdown(parseMarkdown(markdown)) || '<p class="subtle">还没有正文。</p>'}</div>`;
       } else {
-        canvas.innerHTML = `<div class="document-workspace"><details class="block-menu" hidden><summary aria-label="当前块操作">⋮⋮</summary><div class="block-options"><p>块类型</p>${typeButtons}<p>格式</p><button type="button" data-command="bold">加粗</button><p>块操作</p><button type="button" data-action="add">在下方添加</button><button type="button" data-action="up" disabled>上移</button><button type="button" data-action="down" disabled>下移</button><button type="button" data-action="remove" disabled>删除此块</button></div></details><div class="document-editor" contenteditable="true" role="textbox" aria-label="文章正文" aria-multiline="true" spellcheck="false">${renderMarkdown(parseMarkdown(markdown)) || '<p><br></p>'}</div></div><p class="subtle editor-hint">在空白块输入 /，或点正文左侧的块菜单。</p>`;
+        canvas.innerHTML = `<div class="document-workspace"><details class="block-menu" hidden><summary aria-label="当前块操作"><span class="block-type" aria-hidden="true">¶</span><span aria-hidden="true">⋮⋮</span></summary><div class="block-options"><p>块类型</p>${typeButtons}<p>格式</p><button type="button" data-command="bold">加粗</button><p>块操作</p><button type="button" data-action="add">在下方添加</button><button type="button" data-action="up" disabled>上移</button><button type="button" data-action="down" disabled>下移</button><button type="button" data-action="remove" disabled>删除此块</button></div></details><div class="document-editor" contenteditable="true" role="textbox" aria-label="文章正文" aria-multiline="true" spellcheck="false">${renderMarkdown(parseMarkdown(markdown)) || '<p><br></p>'}</div></div><p class="subtle editor-hint">指向正文块可打开左侧菜单，空白块也可以按 /。</p>`;
         documentEditor = canvas.querySelector('.document-editor');
         menu = canvas.querySelector('.block-menu');
+        menu.addEventListener('toggle', event => {
+          if (event.currentTarget === menu) menuBlock?.classList.toggle('block-menu-target',menu.open);
+        });
       }
     }
 
     function changeBlock(button) {
-      const block = activeBlock();
+      const block = menuBlock;
+      hoverOpened = false;
       menu.open = false;
-      if (!activeRange) return;
+      if (!block) return;
       pasteHistory = null;
+      const range = activeRange?.cloneRange() || document.createRange();
+      if (!block.contains(range.startContainer) || (!button.dataset.command && !block.contains(range.endContainer))) {
+        range.selectNodeContents(block);
+        range.collapse(true);
+      }
       documentEditor.focus();
-      selectRange(activeRange);
+      selectRange(range);
       const action = button.dataset.action;
       if (action === 'add' && block) {
         const after = block.localName === 'li' ? block.parentElement : block;
@@ -299,7 +322,36 @@
       }
 
       const type = button.dataset.type;
-      if (type === 'ul' || type === 'ol') document.execCommand(type === 'ul' ? 'insertUnorderedList' : 'insertOrderedList');
+      if (type === 'code' && block.localName !== 'pre') {
+        const code = document.createElement('code');
+        code.textContent = block.innerText;
+        const pre = document.createElement('pre');
+        pre.append(code);
+        const prefix = document.createRange();
+        prefix.selectNodeContents(block);
+        prefix.setEnd(range.startContainer,range.startOffset);
+        const start = prefix.toString().length;
+        prefix.setEnd(range.endContainer,range.endOffset);
+        const end = prefix.toString().length;
+        if (block.localName === 'li') {
+          const list = block.parentElement;
+          const rest = list.cloneNode(false);
+          if (list.localName === 'ol') rest.start = list.start + [...list.children].indexOf(block) + 1;
+          while (block.nextElementSibling) rest.append(block.nextElementSibling);
+          list.after(pre);
+          if (rest.children.length) pre.after(rest);
+          block.remove();
+          if (!list.children.length) list.remove();
+        } else block.replaceWith(pre);
+        if (code.firstChild) {
+          range.setStart(code.firstChild,Math.min(start,code.textContent.length));
+          range.setEnd(code.firstChild,Math.min(end,code.textContent.length));
+          selectRange(range);
+        } else {
+          pre.append(document.createElement('br'));
+          placeCursor(pre);
+        }
+      } else if (type === 'ul' || type === 'ol') document.execCommand(type === 'ul' ? 'insertUnorderedList' : 'insertOrderedList');
       else if (type) document.execCommand('formatBlock',false,({quote:'blockquote',code:'pre'})[type] || type);
       else if (button.dataset.command) document.execCommand(button.dataset.command);
       sync();
@@ -307,9 +359,15 @@
     }
 
     root.addEventListener('click', event => {
+      if (hoverOpened && menu?.contains(event.target) && event.target.closest('summary')) {
+        event.preventDefault();
+        hoverOpened = false;
+        return;
+      }
       const button = event.target.closest('button');
       if (!button) {
         if (documentEditor?.contains(event.target)) {
+          hoverOpened = false;
           menu.open = false;
           trackSelection();
         }
@@ -350,7 +408,7 @@
       if (!text && !html) return;
       event.preventDefault();
       trackSelection();
-      const current = activeBlock();
+      const current = blockAt(activeRange?.startContainer);
       if (current?.closest('pre')) {
         if (text) document.execCommand('insertText',false,text);
       } else {
@@ -376,9 +434,39 @@
       trackSelection();
     });
 
-    canvas.addEventListener('focusin', trackSelection);
-    canvas.addEventListener('keyup', trackSelection);
-    canvas.addEventListener('pointerup', trackSelection);
+    canvas.addEventListener('pointermove', event => {
+      if (!menu || menu.open || event.pointerType === 'touch') return;
+      const block = blockAt(event.target);
+      if (block && block !== menuBlock) positionMenu(block);
+    });
+    canvas.addEventListener('pointerover', event => {
+      if (event.pointerType === 'touch' || !menuBlock || menu.open || !menu.contains(event.target) || !event.target.closest('summary')) return;
+      trackSelection(false);
+      menu.open = true;
+      hoverOpened = true;
+    });
+    canvas.addEventListener('pointerout', event => {
+      if (hoverOpened && menu.contains(event.target) && !menu.contains(event.relatedTarget)) {
+        hoverOpened = false;
+        menu.open = false;
+      }
+      if (!documentEditor || !menu || menu.open || !documentEditor.parentElement.contains(event.target)) return;
+      if (!documentEditor.parentElement.contains(event.relatedTarget)) {
+        positionMenu(document.activeElement === documentEditor ? blockAt(activeRange?.startContainer) : null);
+      }
+    });
+    canvas.addEventListener('mousedown', event => {
+      if (menu?.contains(event.target) && event.button === 0) {
+        trackSelection(false);
+        // Keep the browser's text selection while the pointer operates the block menu.
+        event.preventDefault();
+      }
+    });
+    for (const eventType of ['focusin','keyup','pointerup']) {
+      canvas.addEventListener(eventType, event => {
+        if (documentEditor?.contains(event.target)) trackSelection();
+      });
+    }
     canvas.addEventListener('keydown', event => {
       if (event.isComposing || !documentEditor) return;
       const key = event.key.toLowerCase();
@@ -392,13 +480,14 @@
         sync();
       } else if (event.key === '/' && documentEditor.contains(event.target)) {
         trackSelection();
-        const block = activeBlock();
+        const block = blockAt(activeRange?.startContainer);
         if (activeRange?.collapsed && !(block || documentEditor).textContent.trim()) {
           event.preventDefault();
           menu.open = true;
           menu.querySelector('button').focus();
         }
       } else if (event.key === 'Escape' && menu.open && activeRange) {
+        hoverOpened = false;
         menu.open = false;
         documentEditor.focus();
         selectRange(activeRange);
