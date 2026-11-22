@@ -8,7 +8,8 @@ if errorlevel 1 (
   exit /b 1
 )
 echo Open http://127.0.0.1:8081/ in your browser while this window is open.
-python -u -m http.server 8081 --bind 127.0.0.1
+echo Writing studio login: http://127.0.0.1:8081/admin
+python -u server.py
 set "result=%errorlevel%"
 if not "%result%"=="0" pause
 popd
