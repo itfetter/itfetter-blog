@@ -190,7 +190,12 @@
     let markdown = item.body || '';
     let mode = 'document';
     let activeRange = null;
-    let pasteHistory = null;
+    const undoStack = [];
+    const redoStack = [];
+    let savedDocument = null;
+    let beforeInput = null;
+    let composing = false;
+    let applyingEdit = false;
     let legacy = '';
     if (!item.id) {
       try { legacy = localStorage.getItem('itfetter-draft') || ''; } catch {}
@@ -258,6 +263,78 @@
       trackSelection();
     }
 
+    function snapshot() {
+      trackSelection(false);
+      const content = documentEditor.cloneNode(true);
+      content.querySelectorAll('.block-menu-target,[class=""]').forEach(node => {
+        node.classList.remove('block-menu-target');
+        if (!node.className) node.removeAttribute('class');
+      });
+      const point = (node, offset) => {
+        if (!documentEditor.contains(node)) return null;
+        const path = [];
+        for (; node !== documentEditor; node = node.parentNode) {
+          path.unshift([...node.parentNode.childNodes].indexOf(node));
+        }
+        return {path,offset};
+      };
+      return {html:content.innerHTML,markdown,start:point(activeRange?.startContainer,activeRange?.startOffset),end:point(activeRange?.endContainer,activeRange?.endOffset)};
+    }
+
+    function record(previous, current = snapshot()) {
+      if (!previous) return;
+      if (previous.html === current.html && previous.markdown === current.markdown) return;
+      undoStack.push(previous);
+      if (undoStack.length > 60) undoStack.shift();
+      redoStack.length = 0;
+    }
+
+    function applyEdit(edit) {
+      const previous = snapshot();
+      applyingEdit = true;
+      try { edit(); } finally { applyingEdit = false; }
+      const current = snapshot();
+      if (previous.html === current.html) return;
+      sync();
+      trackSelection();
+      current.markdown = markdown;
+      record(previous,current);
+    }
+
+    function restoreSnapshot(state) {
+      hoverOpened = false;
+      menu.open = false;
+      positionMenu(null);
+      documentEditor.innerHTML = state.html;
+      activeRange = null;
+      documentEditor.focus();
+      const endpoint = point => point?.path.reduce((node,index) => node?.childNodes[index],documentEditor);
+      const start = endpoint(state.start);
+      const end = endpoint(state.end);
+      if (start && end) {
+        const range = document.createRange();
+        const limit = node => node.nodeType === 3 ? node.length : node.childNodes.length;
+        range.setStart(start,Math.min(state.start.offset,limit(start)));
+        range.setEnd(end,Math.min(state.end.offset,limit(end)));
+        selectRange(range);
+      } else {
+        placeCursor(documentEditor.lastElementChild || documentEditor,false);
+      }
+      markdown = state.markdown;
+      exportButton.disabled = !markdown.trim();
+      dirty = true;
+      trackSelection();
+    }
+
+    function stepHistory(isUndo) {
+      const from = isUndo ? undoStack : redoStack;
+      const to = isUndo ? redoStack : undoStack;
+      const state = from.pop();
+      if (!state) return;
+      to.push(snapshot());
+      restoreSnapshot(state);
+    }
+
     function paint() {
       root.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.mode === mode)));
       exportButton.disabled = !markdown.trim();
@@ -265,7 +342,8 @@
       menuBlock = null;
       hoverOpened = false;
       activeRange = null;
-      pasteHistory = null;
+      beforeInput = null;
+      composing = false;
       if (mode === 'source') {
         canvas.innerHTML = `<label class="admin-field editor-source">Markdown 正文<textarea maxlength="180000">${escape(markdown)}</textarea></label>`;
       } else if (mode === 'preview') {
@@ -277,6 +355,9 @@
         menu.addEventListener('toggle', event => {
           if (event.currentTarget === menu) menuBlock?.classList.toggle('block-menu-target',menu.open);
         });
+        if (savedDocument?.markdown === markdown) documentEditor.innerHTML = savedDocument.html;
+        else if (savedDocument) record(savedDocument);
+        savedDocument = null;
       }
     }
 
@@ -285,7 +366,6 @@
       hoverOpened = false;
       menu.open = false;
       if (!block) return;
-      pasteHistory = null;
       const range = activeRange?.cloneRange() || document.createRange();
       if (!block.contains(range.startContainer) || (!button.dataset.command && !block.contains(range.endContainer))) {
         range.selectNodeContents(block);
@@ -306,7 +386,6 @@
         if (action === 'up') block.previousElementSibling.before(block);
         else block.nextElementSibling.after(block);
         placeCursor(block);
-        sync();
         return;
       }
       if (action === 'remove') {
@@ -317,7 +396,6 @@
         if (parent !== documentEditor && !parent.children.length) parent.remove();
         if (!documentEditor.children.length) documentEditor.innerHTML = '<p><br></p>';
         placeCursor(neighbor || documentEditor.firstElementChild);
-        sync();
         return;
       }
 
@@ -354,7 +432,6 @@
       } else if (type === 'ul' || type === 'ol') document.execCommand(type === 'ul' ? 'insertUnorderedList' : 'insertOrderedList');
       else if (type) document.execCommand('formatBlock',false,({quote:'blockquote',code:'pre'})[type] || type);
       else if (button.dataset.command) document.execCommand(button.dataset.command);
-      sync();
       trackSelection();
     }
 
@@ -375,29 +452,51 @@
       }
       if (button.dataset.mode) {
         if (mode === button.dataset.mode) return;
+        if (documentEditor) savedDocument = snapshot();
         mode = button.dataset.mode;
         paint();
       } else if ('restore' in button.dataset) {
         if (markdown.trim() && !window.confirm('用原浏览器草稿替换当前正文？')) return;
+        if (documentEditor) savedDocument = snapshot();
         markdown = legacy;
         dirty = true;
         paint();
       } else if ('export' in button.dataset) {
         download(`${item.id || 'itfetter-draft'}.md`,markdown,'text/markdown;charset=utf-8');
       } else if (menu?.contains(button)) {
-        changeBlock(button);
+        applyEdit(() => changeBlock(button));
       }
     });
 
+    canvas.addEventListener('beforeinput', event => {
+      if (applyingEdit || !documentEditor?.contains(event.target)) return;
+      if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
+        event.preventDefault();
+        stepHistory(event.inputType === 'historyUndo');
+      } else if (!composing) beforeInput = snapshot();
+    });
+    canvas.addEventListener('compositionstart', event => {
+      if (!documentEditor?.contains(event.target)) return;
+      beforeInput = snapshot();
+      composing = true;
+    });
+    canvas.addEventListener('compositionend', () => {
+      if (!composing) return;
+      composing = false;
+      sync();
+      record(beforeInput);
+      beforeInput = null;
+    });
     canvas.addEventListener('input', event => {
       if (mode === 'source') {
         markdown = event.target.value;
         exportButton.disabled = !markdown.trim();
         dirty = true;
-      } else if (documentEditor?.contains(event.target)) {
-        pasteHistory = null;
+      } else if (!applyingEdit && !composing && documentEditor?.contains(event.target)) {
         sync();
         trackSelection();
+        record(beforeInput);
+        beforeInput = null;
       }
     });
 
@@ -407,11 +506,12 @@
       const html = event.clipboardData.getData('text/html');
       if (!text && !html) return;
       event.preventDefault();
-      trackSelection();
-      const current = blockAt(activeRange?.startContainer);
-      if (current?.closest('pre')) {
-        if (text) document.execCommand('insertText',false,text);
-      } else {
+      applyEdit(() => {
+        const current = blockAt(activeRange?.startContainer);
+        if (current?.closest('pre')) {
+          if (text) document.execCommand('insertText',false,text);
+          return;
+        }
         const blocks = clipboardBlocks(html,text);
         if (blocks.length === 1 && blocks[0].type === 'p') {
           document.execCommand('insertHTML',false,renderMarkdown(blocks).slice(3,-4));
@@ -425,13 +525,10 @@
           afterRange.setStart(activeRange.endContainer,activeRange.endOffset);
           const before = readDocument(beforeRange.cloneContents());
           const after = readDocument(afterRange.cloneContents());
-          pasteHistory = {before:documentEditor.innerHTML, after:renderMarkdown([...before,...blocks,...after]), undone:false};
-          documentEditor.innerHTML = pasteHistory.after;
+          documentEditor.innerHTML = renderMarkdown([...before,...blocks,...after]);
           placeCursor(documentEditor.children[before.length + blocks.length - 1],false);
         }
-      }
-      sync();
-      trackSelection();
+      });
     });
 
     canvas.addEventListener('pointermove', event => {
@@ -467,17 +564,14 @@
         if (documentEditor?.contains(event.target)) trackSelection();
       });
     }
-    canvas.addEventListener('keydown', event => {
+    root.addEventListener('keydown', event => {
       if (event.isComposing || !documentEditor) return;
       const key = event.key.toLowerCase();
       const undo = key === 'z' && !event.shiftKey;
       const redo = key === 'y' || (key === 'z' && event.shiftKey);
-      if ((event.ctrlKey || event.metaKey) && pasteHistory && ((undo && !pasteHistory.undone) || (redo && pasteHistory.undone))) {
+      if ((event.ctrlKey || event.metaKey) && (undo || redo)) {
         event.preventDefault();
-        pasteHistory.undone = undo;
-        documentEditor.innerHTML = undo ? pasteHistory.before : pasteHistory.after;
-        placeCursor(documentEditor.lastElementChild || documentEditor,false);
-        sync();
+        stepHistory(undo);
       } else if (event.key === '/' && documentEditor.contains(event.target)) {
         trackSelection();
         const block = blockAt(activeRange?.startContainer);
