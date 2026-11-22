@@ -118,15 +118,27 @@
   async function save(change, message, form) {
     if (busy) return;
     busy = true;
+    const keepEditing = form && change.collection === 'posts' && change.item?.status === 'draft';
+    const wasDirty = dirty;
+    if (keepEditing) dirty = false;
     const buttons = form ? [...form.querySelectorAll('button[type=submit],#withdraw-post')] : [];
     buttons.forEach(button => { button.disabled = true; });
     notify('正在保存…');
     try {
       data = await api(change);
-      dirty = false;
-      render();
+      if (keepEditing) {
+        if (!change.id) {
+          // The server appends new articles to the returned list.
+          form.dataset.postId = data.posts.at(-1).id;
+          page.querySelector('.admin-page-head h2').textContent = '编辑文章';
+        }
+      } else {
+        dirty = false;
+        render();
+      }
       notify(message);
     } catch (error) {
+      if (keepEditing) dirty ||= wasDirty;
       notify(error.message, true);
     } finally {
       busy = false;
@@ -176,7 +188,7 @@
         fields.body = editor();
         fields.status = event.submitter?.value || 'draft';
       }
-      save({collection,id:entry.id || '',item:fields}, fields.status === 'published' ? '已发布到博客。' : '草稿已保存。', form);
+      save({collection,id:form.dataset.postId || entry.id || '',item:fields}, fields.status === 'published' ? '已发布到博客。' : '草稿已保存。', form);
     });
     form.querySelector('[name=title]').focus();
   }
