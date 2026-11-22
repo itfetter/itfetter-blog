@@ -26,6 +26,7 @@
         <button class="icon" id="theme" aria-label="切换配色"></button>
       </div>
     </div>
+    <div class="wrap" id="article-return" hidden><a class="back" href="#archive"><span aria-hidden="true">←</span>返回</a></div>
   </header>
   <main id="main" class="wrap" tabindex="-1"><noscript>请启用 JavaScript 浏览博客原型。</noscript></main>
   <footer><div class="wrap footer-inner"><span id="footer-brand"></span><div class="footer-links"><a href="#about">关于本站</a><a id="github-link" hidden>GitHub</a></div></div></footer>
@@ -53,6 +54,8 @@
     }
 
     const main = document.querySelector('main');
+    const articleReturnBar = document.querySelector('#article-return');
+    const articleBack = articleReturnBar.querySelector('a');
     const dialog = document.querySelector('#search');
     const query = document.querySelector('#query');
     const results = document.querySelector('#results');
@@ -111,13 +114,12 @@
     }
 
     function article(post) {
-      const returnLink = history.state?.articleReturn?.hash || '#archive';
       const related = posts.find(item => item.topic === post.topic && item !== post);
       const blocks = markdownBlocks(post.body);
       const links = blocks.filter(block => /^h[1-6]$/.test(block.type)).map((block, i) => `<li><a href="${postLink(post)}/${i + 1}">${escapeHtml(block.text)}</a></li>`).join('');
       const discussion = `<a class="toc-comments" href="${postLink(post)}/comments"><span>讨论与评论</span><span class="comment-count" data-comment-count>${commentLabel(post)}</span></a>`;
       const toc = cssClass => `<nav class="toc ${cssClass}" aria-label="本文目录"><strong>本文目录</strong>${links ? `<ol>${links}</ol>` : ''}${discussion}</nav>`;
-      return `<div class="article-grid"><article class="reading"><a class="back" href="${escapeHtml(returnLink)}"><span aria-hidden="true">←</span>返回</a>${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p>${post.sample ? '<p class="meta">原型样稿</p>' : ''}
+      return `<div class="article-grid"><article class="reading">${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p>${post.sample ? '<p class="meta">原型样稿</p>' : ''}
         ${cover(post)}${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}
         ${post.id === 'working-with-coding-agents' && post.sample ? '<div class="table-scroll" tabindex="0"><table><caption>文章列表验收示例</caption><thead><tr><th scope="col">检查项</th><th scope="col">怎么验证</th><th scope="col">期望结果</th></tr></thead><tbody><tr><th scope="row">空列表</th><td>筛选无匹配内容</td><td>提示可以换一个主题</td></tr><tr><th scope="row">长标题</th><td>在手机宽度阅读两行以上标题</td><td>日期和标题清晰对齐</td></tr><tr><th scope="row">分页</th><td>筛选后切换到下一页</td><td>主题条件继续生效</td></tr></tbody></table></div>' : ''}</div>
         ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}
@@ -263,6 +265,8 @@
       pendingReturn = undefined;
       currentPage = page;
       currentPost = post ? post.id : '';
+      articleReturnBar.hidden = !post;
+      if (post) articleBack.href = history.state?.articleReturn?.hash || '#archive';
       const current = page === 'post' ? 'archive' : page;
       document.querySelectorAll('.nav a').forEach(link => {
         if (link.hash === `#${current}`) link.setAttribute('aria-current','page');
@@ -397,13 +401,6 @@
     main.addEventListener('click', async event => {
       const link = event.target.closest('a');
       if (link && event.button === 0 && !event.defaultPrevented && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-        const previous = history.state?.articleReturn;
-        if (link.classList.contains('back') && previous) {
-          event.preventDefault();
-          pendingReturn = previous;
-          history.go(-previous.steps);
-          return;
-        }
         const destination = link.getAttribute('href');
         if (destination?.startsWith('#post/')) {
           event.preventDefault();
@@ -417,6 +414,14 @@
         await navigator.clipboard.writeText(copy.closest('.code-panel').querySelector('code').textContent);
         copy.textContent = '已复制';
       } catch { copy.textContent = '请手动复制'; }
+    });
+    articleBack.addEventListener('click', event => {
+      if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const previous = history.state?.articleReturn;
+      if (!previous) return;
+      event.preventDefault();
+      pendingReturn = previous;
+      history.go(-previous.steps);
     });
     window.addEventListener('scroll', updateProgress, {passive:true});
     window.addEventListener('resize', updateProgress);

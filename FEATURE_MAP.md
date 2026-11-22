@@ -10,7 +10,7 @@
 | 路由、导航与标题 | `render()`、`navigateToArticle()`、`hashchange`、`.nav` | 文章返回进入时的页面与筛选、恢复搜索、目录跳转后仍能返回入口、直达链接回退归档 |
 | 关于本站 | `about()`、`settings`、`.about-page`、`.about-links` | 作者介绍、后台 Markdown、GitHub 链接、推荐文章、移动端单列 |
 | 归档和筛选 | `archive()`、`row()`、`.filter-bar`、`.pill` | 年份分组、结果计数、重新筛选后的焦点 |
-| 文章阅读 | `article()`、`postLink()`、`updateProgress()`、`[data-copy]` | 目录定位、阅读进度、代码复制、表格横滚和相关页 |
+| 文章阅读 | `article()`、`#article-return`、`postLink()`、`updateProgress()`、`[data-copy]` | 导航下方固定返回、目录定位、阅读进度、代码复制、表格横滚和相关页 |
 | 搜索弹层 | `#search`、`search()`、`openSearch()`、`openResult()`、`#query` 键盘处理 | `/` 或 `Ctrl/Cmd+K`、正文关键词、无结果恢复、方向键、Enter 与 Esc |
 | 笔记和项目 | `indexCards()`、`notes`、`projects` | 笔记详情展开，项目跳转的文章 `id` 仍存在 |
 | 后台登录 | `server.py` 的 `GET /admin`、`POST /admin/login`、`POST /admin/logout` | 未登录、错误密码、有效会话、退出、直接请求模板 |

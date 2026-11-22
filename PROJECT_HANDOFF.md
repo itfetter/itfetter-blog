@@ -23,6 +23,7 @@
 | 样例内容版 · `1853c0b` | `assets/`、`content.js`、`index.html`、`styles.css`、`server.py` 和项目文档 | 为样稿增加两张原创封面和三篇文章的八条标记为示例的评论，包含楼中回复。已有的本地预览按评论 ID 补入示例。 |
 | 关于页与阅读导航 | `index.html`、`styles.css` 和项目文档 | 关于页展示作者介绍、GitHub 与推荐阅读。文章顶部的「返回」恢复来源页面及搜索，直接打开文章时回到归档。 |
 | 站点标志 | `assets/itfetter-icon.svg`、`index.html`、`server.py`、`styles.css` 和项目文档 | 采用蓝底白字的 `i>`，前台与后台共用同一标签图标和页眉标志。 |
+| 文章固定返回 | `index.html`、`styles.css` 和项目文档 | 返回链接随顶部导航固定，目录跳转为增加的高度预留空间。Chrome 已核对桌面和窄屏定位及返回首页。 |
 
 ## 预览与部署
 
