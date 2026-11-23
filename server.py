@@ -8,7 +8,7 @@ from pathlib import Path
 from threading import Lock
 from urllib.parse import parse_qs, urlsplit
 
-from content_store import add_article_comment, article_comments, public_script, read_content, update_content, write_content
+from content_store import add_article_comment, article_comments, public_script, read_content, update_content, update_engagement, write_content
 
 
 ROOT = Path(__file__).resolve().parent
@@ -24,6 +24,7 @@ STATIC_FILES = {
     "/assets/itfetter-icon.svg": ("assets/itfetter-icon.svg", "image/svg+xml"),
 }
 SESSION_COOKIE = "itfetter_session"
+VISITOR_COOKIE = "itfetter_reader"
 SESSIONS = set()
 CONTENT_LOCK = Lock()
 # These are the requested defaults for the loopback-only preview.
@@ -33,20 +34,25 @@ ADMIN_PASSWORD = "123456"
 
 class BlogHandler(BaseHTTPRequestHandler):
     def session_token(self):
+        return self.cookie_value(SESSION_COOKIE)
+
+    def cookie_value(self, name):
         cookie = SimpleCookie()
         try:
             cookie.load(self.headers.get("Cookie", ""))
         except CookieError:
             return None
-        session = cookie.get(SESSION_COOKIE)
-        return session.value if session else None
+        entry = cookie.get(name)
+        return entry.value if entry else None
 
-    def send_content(self, status, content, content_type, *, private=False):
+    def send_content(self, status, content, content_type, *, private=False, cookie=None):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(content)))
         if private:
             self.send_header("Cache-Control", "no-store")
+        if cookie:
+            self.send_header("Set-Cookie", cookie)
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(content)
@@ -107,8 +113,8 @@ class BlogHandler(BaseHTTPRequestHandler):
             self.send_header("Set-Cookie", cookie)
         self.end_headers()
 
-    def send_json(self, status, data):
-        self.send_content(status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8", private=True)
+    def send_json(self, status, data, *, cookie=None):
+        self.send_content(status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8", private=True, cookie=cookie)
 
     def do_GET(self):
         path = urlsplit(self.path).path
@@ -147,6 +153,9 @@ class BlogHandler(BaseHTTPRequestHandler):
         if path == "/api/comments":
             self.handle_comments()
             return
+        if path == "/api/post-stats":
+            self.handle_post_stats()
+            return
         if path == "/admin/logout":
             SESSIONS.discard(self.session_token())
             self.redirect_to_admin(f"{SESSION_COOKIE}=; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=0")
@@ -168,6 +177,34 @@ class BlogHandler(BaseHTTPRequestHandler):
         token = secrets.token_urlsafe(32)
         SESSIONS.add(token)
         self.redirect_to_admin(f"{SESSION_COOKIE}={token}; Path=/admin; HttpOnly; SameSite=Strict")
+
+    def handle_post_stats(self):
+        post_id = parse_qs(urlsplit(self.path).query).get("post", [""])[0]
+        length = self.headers.get("Content-Length", "")
+        try:
+            if self.headers.get_content_type() != "application/json" or not length.isdecimal() or not 0 < int(length) <= 128:
+                raise ValueError("文章统计请求格式有误。")
+            action = json.loads(self.rfile.read(int(length)))
+            if action not in ("view", "like", "unlike"):
+                raise ValueError("未知的统计操作。")
+            visitor = self.cookie_value(VISITOR_COOKIE)
+            cookie = None
+            if not visitor or len(visitor) != 32 or any(char not in "0123456789abcdef" for char in visitor):
+                visitor = secrets.token_hex(16)
+                cookie = f"{VISITOR_COOKIE}={visitor}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000"
+            with CONTENT_LOCK:
+                data = read_content()
+                stats, changed = update_engagement(data, post_id, visitor, action)
+                if changed:
+                    write_content(data)
+        except LookupError as error:
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": str(error)})
+        except (ValueError, UnicodeError) as error:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
+        except OSError:
+            self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "文章统计暂时无法读取或保存。"})
+        else:
+            self.send_json(HTTPStatus.OK, stats, cookie=cookie)
 
     def handle_comments(self):
         post_id = parse_qs(urlsplit(self.path).query).get("post", [""])[0]

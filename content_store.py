@@ -22,8 +22,12 @@ def public_script(data):
     for collection in COLLECTIONS:
         public[collection] = [{key: value for key, value in item.items() if key != "draft"} for item in data[collection] if item["status"] == "published"]
     comments = data.get("comments", {})
+    engagement = data.get("engagement", {})
     for post in public["posts"]:
         post["commentCount"] = len(comments.get(post["id"], []))
+        stats = engagement.get(post["id"], {})
+        post["viewCount"] = stats.get("views", 0)
+        post["likeCount"] = len(stats.get("likes", []))
     return "window.blogContent = " + json.dumps(public, ensure_ascii=False) + ";\n"
 
 
@@ -77,6 +81,7 @@ def update_content(data, change):
         items.remove(current)
         if collection == "posts":
             data.get("comments", {}).pop(item_id, None)
+            data.get("engagement", {}).pop(item_id, None)
             for project in data["projects"]:
                 if project.get("post") == item_id:
                     project["post"] = ""
@@ -116,6 +121,28 @@ def update_content(data, change):
     if collection == "posts" and data["settings"]["featured"] == item_id:
         if values is None or fields["status"] != "published":
             data["settings"]["featured"] = ""
+
+
+def update_engagement(data, post_id, visitor, action):
+    if not any(post["id"] == post_id and post["status"] == "published" for post in data["posts"]):
+        raise LookupError("文章不存在或尚未发布。")
+    stats = data.setdefault("engagement", {}).setdefault(post_id, {"views": 0, "likes": [], "day": "", "visitors": []})
+    changed = False
+    if action == "view":
+        today = date.today().isoformat()
+        if stats["day"] != today:
+            stats.update(day=today, visitors=[])
+        if visitor not in stats["visitors"]:
+            stats["visitors"].append(visitor)
+            stats["views"] += 1
+            changed = True
+    elif action == "like" and visitor not in stats["likes"]:
+        stats["likes"].append(visitor)
+        changed = True
+    elif action == "unlike" and visitor in stats["likes"]:
+        stats["likes"].remove(visitor)
+        changed = True
+    return {"viewCount": stats["views"], "likeCount": len(stats["likes"]), "liked": visitor in stats["likes"]}, changed
 
 
 def article_comments(data, post_id):

@@ -66,6 +66,7 @@
     const date = post => `<time datetime="${post.date}">${post.date.replaceAll('-', '.')}</time>`;
     const metadata = post => `<div class="meta"><span class="tag">${topics[post.topic]}</span>${date(post)}</div>`;
     const commentLabel = post => `${post.commentCount ?? 0} 条评论`;
+    const engagementLabel = post => `${post.viewCount ?? 0} 次浏览 · ${post.likeCount ?? 0} 赞`;
     const sampleCovers = new Map([
       ['working-with-coding-agents', ['ai-workflow.jpg', '浅色桌面上的笔记本电脑与记录任务的方格本']],
       ['small-tool-first-release', ['first-release.jpg', '桌面上的小键盘、蓝色 U 盘与索引卡片']],
@@ -79,7 +80,7 @@
       const [filename, alt] = image;
       return `<img class="cover-image" src="assets/${filename}" alt="${alt}" width="900" height="600" decoding="async">`;
     };
-    const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<div class="row-content"><strong>${escapeHtml(post.title)}</strong><small>${escapeHtml(post.summary)}</small></div><span class="row-meta"><span class="tag">${topics[post.topic]}</span><span class="comment-count">${commentLabel(post)}</span></span></a></li>`;
+    const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<div class="row-content"><strong>${escapeHtml(post.title)}</strong><small>${escapeHtml(post.summary)}</small></div><span class="row-meta"><span class="tag">${topics[post.topic]}</span><span class="article-counts">${engagementLabel(post)} <span aria-hidden="true">·</span> ${commentLabel(post)}</span></span></a></li>`;
     const progress = document.querySelector('#progress');
     let currentPage = '';
     let currentPost = '';
@@ -128,7 +129,7 @@
         <div><p class="hero-author">${escapeHtml(settings.author)} 的个人博客</p><h1 id="welcome">${escapeHtml(settings.title)}</h1>
         <p class="hero-description">${escapeHtml(settings.description)}</p>
         <div class="actions"><a class="primary" href="#archive">浏览文章</a><a class="secondary" href="#about">关于我</a></div></div>
-        ${lead ? `<a class="feature" href="${postLink(lead)}">${cover(lead)}<span class="feature-label">置顶文章</span><h2>${escapeHtml(lead.title)}</h2><p>${escapeHtml(lead.summary)}</p><div class="meta"><span class="tag">${topics[lead.topic]}</span>${date(lead)}<span class="comment-count">${commentLabel(lead)}</span></div></a>` : ''}
+        ${lead ? `<a class="feature" href="${postLink(lead)}">${cover(lead)}<span class="feature-label">置顶文章</span><h2>${escapeHtml(lead.title)}</h2><p>${escapeHtml(lead.summary)}</p><div class="meta"><span class="tag">${topics[lead.topic]}</span>${date(lead)}<span class="article-counts">${engagementLabel(lead)} <span aria-hidden="true">·</span> ${commentLabel(lead)}</span></div></a>` : ''}
         </section>
         <div class="home-grid"><section class="section" aria-labelledby="latest-title"><div class="section-head"><h2 id="latest-title">最近文章</h2><a href="#archive">查看归档</a></div>${latest.length ? `<ul class="rows">${latest.map(row).join('')}</ul>` : '<p class="subtle">暂无最近文章。</p>'}</section>
         <aside class="home-aside" aria-label="主题和笔记"><section><h2>按主题浏览</h2><ul class="topic-list">${Object.entries(topics).map(([key, name]) => `<li><a href="#archive/${key}"><span>${name}</span><span>${posts.filter(post => post.topic === key).length}</span></a></li>`).join('')}</ul></section>
@@ -152,12 +153,48 @@
       const discussion = `<a class="toc-comments" href="${postLink(post)}/comments"><span>讨论与评论</span><span class="comment-count" data-comment-count>${commentLabel(post)}</span></a>`;
       const toc = cssClass => `<nav class="toc ${cssClass}" aria-label="本文目录"><strong>本文目录</strong>${links ? `<ol>${links}</ol>` : ''}${discussion}</nav>`;
       return `<div class="article-grid"><article class="reading">${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p>${post.sample ? '<p class="meta">原型样稿</p>' : ''}
+        <div class="article-engagement"><span data-view-count>${post.viewCount ?? 0} 次浏览</span><button type="button" class="secondary" aria-label="点赞文章" aria-pressed="false" disabled><span aria-hidden="true">♡</span><span data-like-label>点赞 ${post.likeCount ?? 0}</span></button><span role="status"></span></div>
         ${cover(post)}${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}
         ${post.id === 'working-with-coding-agents' && post.sample ? '<div class="table-scroll" tabindex="0"><table><caption>文章列表验收示例</caption><thead><tr><th scope="col">检查项</th><th scope="col">怎么验证</th><th scope="col">期望结果</th></tr></thead><tbody><tr><th scope="row">空列表</th><td>筛选无匹配内容</td><td>提示可以换一个主题</td></tr><tr><th scope="row">长标题</th><td>在手机宽度阅读两行以上标题</td><td>日期和标题清晰对齐</td></tr><tr><th scope="row">分页</th><td>筛选后切换到下一页</td><td>主题条件继续生效</td></tr></tbody></table></div>' : ''}</div>
         ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}
         <section class="article-comments" aria-labelledby="section-comments"><div class="discussion-heading"><h2 id="section-comments" tabindex="-1">讨论与评论</h2><span class="comment-count" data-comment-count>${commentLabel(post)}</span></div>
         <form class="comment-form" hidden><label>昵称<input name="author" maxlength="40" autocomplete="nickname" required></label><div class="comment-reply" hidden><span></span><button type="button" class="secondary">取消回复</button></div><label>评论<textarea name="body" rows="4" maxlength="2000" required placeholder="分享你的实践经验，或提一个问题"></textarea></label><div class="comment-form-actions"><small>支持行内代码 · Ctrl / ⌘ + Enter 发布</small><button type="submit" class="primary">发表评论</button></div></form>
         <p class="comment-feedback" role="status">正在加载评论…</p><button type="button" class="secondary comment-retry" hidden>重新加载</button><div class="comment-list"></div></section></article>${toc('')}</div>`;
+    }
+
+    function mountEngagement(post) {
+      const panel = main.querySelector('.article-engagement');
+      const view = panel.querySelector('[data-view-count]');
+      const button = panel.querySelector('button');
+      const status = panel.querySelector('[role=status]');
+      const endpoint = `./api/post-stats?post=${encodeURIComponent(post.id)}`;
+      let liked = false;
+
+      async function update(action) {
+        button.disabled = true;
+        status.textContent = '';
+        try {
+          const response = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(action)});
+          if (!response.ok) throw new Error();
+          const result = await response.json();
+          post.viewCount = result.viewCount;
+          post.likeCount = result.likeCount;
+          liked = result.liked;
+          view.textContent = `${post.viewCount} 次浏览`;
+          button.setAttribute('aria-pressed', String(liked));
+          button.querySelector('[aria-hidden]').textContent = liked ? '♥' : '♡';
+          button.querySelector('[data-like-label]').textContent = `${liked ? '已点赞' : '点赞'} ${post.likeCount}`;
+          button.disabled = false;
+        } catch {
+          if (action === 'view') status.textContent = '实时统计暂不可用。';
+          else {
+            status.textContent = '点赞未保存，请重试。';
+            button.disabled = false;
+          }
+        }
+      }
+      button.addEventListener('click', () => update(liked ? 'unlike' : 'like'));
+      update('view');
     }
 
     function mountComments(post) {
@@ -312,6 +349,7 @@
         if (!stayOnArticle) {
           main.innerHTML = article(post);
           mountComments(post);
+          mountEngagement(post);
         }
       }
       else if (page === 'notes') main.innerHTML = notesPage(key, section);

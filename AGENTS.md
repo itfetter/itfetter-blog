@@ -26,6 +26,7 @@
 - `posts` 包含稳定的 `id`、`topic`、`date`、`title`、`summary`、Markdown `body` 和 `status`。主题键由 `topics` 定义。
 - `notes` 包含分类、日期、标题、摘要和 Markdown 正文。`projects` 包含进度、标题、说明、可选 Markdown 详情、网址和关联文章 `id`。所有内容都有 `id` 和发布状态，取值 `draft` 或 `published`。
 - `settings` 保存站名、作者、首页介绍、关于页、GitHub 链接和置顶文章。`blog-data.json` 保存实际内容，`content.js` 是可跟踪的初始内容和公开导出格式。
+- `engagement` 按文章 ID 保存浏览累计、当日去重记录和匿名点赞。公开数据只含浏览和点赞总数。
 - 浏览器使用 `itfetter-theme` 保存主题偏好。旧版 `itfetter-draft` 可以从新建文章页面带入。发布时间使用 `YYYY-MM-DD`。
 
 ## 修改边界、API 与数据库

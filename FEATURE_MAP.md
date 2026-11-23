@@ -19,6 +19,7 @@
 | 文档编辑 | `admin.js` 的 `articleEditor()`、`snapshot()` 和 `stepHistory()`，`markdown.js` 的 `fromDocument()` 与 `clipboardBlocks()` | 连续输入、粘贴、正文和手柄的两段悬停、选区保留、列表项转换及 Markdown 往返；跨输入、粘贴和块操作的连续撤销与重做 |
 | 文章发布与草稿 | `admin.js` 的 `contentList()`、`openEditor()` 和 `save()`，`content_store.py` 的 `update_content()`、`public_script()` | 停止输入后自动保存、保存后继续编辑、重复保存更新同一篇、草稿与已发布版本隔离、发布更新、显式撤回 |
 | 文章评论 | `index.html` 的 `row()`、`article()`、`mountComments()`，`server.py` 的 `/api/comments`，`content_store.py` 的评论读写和 `public_script()`，`styles.css` 的讨论区样式 | 评论及回复计数、目录跳转、留言和回复、刷新后保留、无评论和接口不可用提示、仅开放已发布文章 |
+| 浏览量与点赞 | `index.html` 的 `mountEngagement()`，`server.py` 的 `POST /api/post-stats?post=文章ID`，`content_store.py` 的 `update_engagement()` 和 `public_script()` | 当日按匿名浏览器标识去重、点赞和取消、各页面的计数同步、仅开放已发布文章 |
 | 站点设置 | `admin.js` 的 `settingsForm()`、`content_store.py` 的 `public_script()`、`index.html` 的 `settings` | 首页、页脚和关于页同步，置顶关联，静态导出排除草稿 |
 | 浅色和深色 | `:root`、`[data-theme]`、`updateThemeButton()`、`itfetter-theme` | 系统默认主题、手动切换、刷新恢复、对比度 |
 | 本地预览 | [start-preview.bat](start-preview.bat) | 根目录 `index.html` 返回 HTTP 200，端口只在本机监听 |
