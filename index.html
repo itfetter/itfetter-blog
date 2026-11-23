@@ -41,7 +41,7 @@
   <script src="./markdown.js"></script>
   <script>
     const {topics, posts, notes, projects, settings} = window.blogContent;
-    const {escape:escapeHtml, blocks:markdownBlocks, render:renderMarkdown} = window.blogMarkdown;
+    const {escape:escapeHtml, blocks:markdownBlocks, render:renderMarkdown,coverImage} = window.blogMarkdown;
     posts.sort((a,b) => b.date.localeCompare(a.date));
     notes.sort((a,b) => b.date.localeCompare(a.date));
     document.querySelector('#brand-name').textContent = settings.author;
@@ -67,19 +67,8 @@
     const metadata = post => `<div class="meta"><span class="tag">${topics[post.topic]}</span>${date(post)}</div>`;
     const commentLabel = post => `${post.commentCount ?? 0} 条评论`;
     const engagementLabel = post => `${post.viewCount ?? 0} 次浏览 · ${post.likeCount ?? 0} 赞`;
-    const sampleCovers = new Map([
-      ['working-with-coding-agents', ['ai-workflow.jpg', '浅色桌面上的笔记本电脑与记录任务的方格本']],
-      ['small-tool-first-release', ['first-release.jpg', '桌面上的小键盘、蓝色 U 盘与索引卡片']],
-      ['markdown-preview-roundtrip', ['markdown-preview.jpg', '显示文档与预览分栏的电脑和桌上的纸质笔记本']],
-      ['project-markdown-preview', ['markdown-preview.jpg', '显示文档与预览分栏的电脑和桌上的纸质笔记本']],
-      ['read-local-preview-metrics', ['local-metrics.jpg', '桌上的电脑显示加载趋势图，旁边放着笔和便签']]
-    ]);
-    const cover = item => {
-      const image = item.sample && sampleCovers.get(item.id);
-      if (!image) return '';
-      const [filename, alt] = image;
-      return `<img class="cover-image" src="assets/${filename}" alt="${alt}" width="900" height="600" decoding="async">`;
-    };
+    const cover = item => item.id === 'project-markdown-preview' && item.sample ?
+      coverImage({cover:'assets/markdown-preview.jpg',coverAlt:'显示文档和预览分栏的电脑与纸质笔记本'}) : coverImage(item);
     const row = post => `<li><a class="row" href="${postLink(post)}">${date(post)}<div class="row-content"><strong>${escapeHtml(post.title)}</strong><small>${escapeHtml(post.summary)}</small></div><span class="row-meta"><span class="tag">${topics[post.topic]}</span><span class="article-counts">${engagementLabel(post)} <span aria-hidden="true">·</span> ${commentLabel(post)}</span></span></a></li>`;
     const progress = document.querySelector('#progress');
     let currentPage = '';
@@ -154,8 +143,7 @@
       const toc = cssClass => `<nav class="toc ${cssClass}" aria-label="本文目录"><strong>本文目录</strong>${links ? `<ol>${links}</ol>` : ''}${discussion}</nav>`;
       return `<div class="article-grid"><article class="reading">${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p>${post.sample ? '<p class="meta">原型样稿</p>' : ''}
         <div class="article-engagement"><span data-view-count>${post.viewCount ?? 0} 次浏览</span><button type="button" class="secondary" aria-label="点赞文章" aria-pressed="false" disabled><span aria-hidden="true">♡</span><span data-like-label>点赞 ${post.likeCount ?? 0}</span></button><span role="status"></span></div>
-        ${cover(post)}${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}
-        ${post.id === 'working-with-coding-agents' && post.sample ? '<div class="table-scroll" tabindex="0"><table><caption>文章列表验收示例</caption><thead><tr><th scope="col">检查项</th><th scope="col">怎么验证</th><th scope="col">期望结果</th></tr></thead><tbody><tr><th scope="row">空列表</th><td>筛选无匹配内容</td><td>提示可以换一个主题</td></tr><tr><th scope="row">长标题</th><td>在手机宽度阅读两行以上标题</td><td>日期和标题清晰对齐</td></tr><tr><th scope="row">分页</th><td>筛选后切换到下一页</td><td>主题条件继续生效</td></tr></tbody></table></div>' : ''}</div>
+        ${cover(post)}${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}</div>
         ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}
         <section class="article-comments" aria-labelledby="section-comments"><div class="discussion-heading"><h2 id="section-comments" tabindex="-1">讨论与评论</h2><span class="comment-count" data-comment-count>${commentLabel(post)}</span></div>
         <form class="comment-form" hidden><label>昵称<input name="author" maxlength="40" autocomplete="nickname" required></label><div class="comment-reply" hidden><span></span><button type="button" class="secondary">取消回复</button></div><label>评论<textarea name="body" rows="4" maxlength="2000" required placeholder="分享你的实践经验，或提一个问题"></textarea></label><div class="comment-form-actions"><small>支持行内代码 · Ctrl / ⌘ + Enter 发布</small><button type="submit" class="primary">发表评论</button></div></form>

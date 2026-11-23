@@ -17,6 +17,7 @@
 | 后台栏目 | `admin.js` 初始化的 `requestedView` 和 `switchView()` | 栏目切换更新地址，刷新与直达恢复栏目，无效片段回到总览 |
 | 内容管理 | `admin.js` 的 `contentList()`、`openEditor()`、`confirmAction()`，`/admin/content`、`content_store.py` 的 `update_content()` | 搜索和状态筛选、文章浏览评论点赞数、新建编辑、撤回及删除确认 |
 | 文档编辑 | `admin.js` 的 `articleEditor()`、`snapshot()` 和 `stepHistory()`，`markdown.js` 的 `fromDocument()` 与 `clipboardBlocks()` | 连续输入、粘贴、块菜单贴边定位、选区格式工具栏、选区保留、列表项转换、Markdown 往返及撤销重做 |
+| 文章表格和封面 | `markdown.js` 的 `blocks()`、`source()`、`render()`、`coverImage()`，`admin.js` 的表格操作，`content_store.py` 的旧样稿兼容 | 表格插入、加行加列、Tab 换格、预览和发布对照、封面与替代文字、窄屏表格独立滚动 |
 | 文章发布与草稿 | `admin.js` 的 `contentList()`、`openEditor()` 和 `save()`，`content_store.py` 的 `update_content()`、`public_script()` | 停止输入后自动保存、保存后继续编辑、重复保存更新同一篇、草稿与已发布版本隔离、发布更新、显式撤回 |
 | 文章评论 | `index.html` 的 `row()`、`article()`、`mountComments()`，`server.py` 的 `/api/comments`，`content_store.py` 的评论读写和 `public_script()`，`styles.css` 的讨论区样式 | 评论及回复计数、目录跳转、留言和回复、刷新后保留、无评论和接口不可用提示、仅开放已发布文章 |
 | 浏览量与点赞 | `index.html` 的 `mountEngagement()`，`server.py` 的 `POST /api/post-stats?post=文章ID`，`content_store.py` 的 `update_engagement()` 和 `public_script()` | 当日按匿名浏览器标识去重、点赞和取消、各页面的计数同步、仅开放已发布文章 |

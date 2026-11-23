@@ -12,9 +12,28 @@ COLLECTIONS = ("posts", "notes", "projects")
 
 
 def read_content():
-    if DATA.exists():
-        return json.loads(DATA.read_text(encoding="utf-8"))
-    return json.loads(SEED.read_text(encoding="utf-8").removeprefix("window.blogContent = ").strip().removesuffix(";"))
+    if not DATA.exists():
+        return json.loads(SEED.read_text(encoding="utf-8").removeprefix("window.blogContent = ").strip().removesuffix(";"))
+    data = json.loads(DATA.read_text(encoding="utf-8"))
+    samples = [post for post in data["posts"] if post.get("sample")]
+    if not samples:
+        return data
+    seed = json.loads(SEED.read_text(encoding="utf-8").removeprefix("window.blogContent = ").strip().removesuffix(";"))
+    originals = {post["id"]: post for post in seed["posts"]}
+    for post in samples:
+        original = originals.get(post["id"], {})
+        for version in (post, post.get("draft")):
+            if version is None:
+                continue
+            if "cover" in original:
+                version.setdefault("cover", original["cover"])
+                version.setdefault("coverAlt", original["coverAlt"])
+            if post["id"] == "working-with-coding-agents":
+                old_body, _, table = original["body"].partition("\n\n文章列表验收示例\n\n")
+                last_paragraph = old_body.rsplit("\n\n", 1)[-1]
+                if last_paragraph in version["body"] and "| 检查项 | 怎么验证 | 期望结果 |" not in version["body"]:
+                    version["body"] = version["body"].replace(last_paragraph, f"{last_paragraph}\n\n文章列表验收示例\n\n{table}", 1)
+    return data
 
 
 def public_script(data):
@@ -88,7 +107,18 @@ def update_content(data, change):
     elif isinstance(values, dict):
         common = {"title": 150, "status": 12}
         if collection == "posts":
-            fields = text_fields(values, {**common, "topic": 20, "date": 10, "summary": 350, "body": 180000}, ("summary", "body"))
+            fields = text_fields(values, {**common, "topic": 20, "date": 10, "summary": 350, "body": 180000, "cover": 500, "coverAlt": 150}, ("summary", "body", "cover", "coverAlt"))
+            if current:
+                previous = current["draft"] if fields["status"] == "draft" and "draft" in current else current
+                for field in ("cover", "coverAlt"):
+                    if field not in values:
+                        fields[field] = previous.get(field, "")
+            if fields["cover"].startswith("assets/"):
+                filename = fields["cover"].removeprefix("assets/")
+                if not filename or any(char in filename for char in "/\\?#") or not (ROOT / "assets" / filename).is_file():
+                    raise ValueError("请选择已有的本地封面，或填写 HTTP / HTTPS 图片地址。")
+            else:
+                validate_url(fields["cover"])
             if fields["topic"] not in data["topics"]:
                 raise ValueError("请选择文章主题。")
             if fields["status"] == "published" and not (fields["summary"] and fields["body"]):

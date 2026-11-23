@@ -2,9 +2,10 @@
   const page = document.querySelector('#admin-page');
   const feedback = document.querySelector('#admin-status');
   const confirmation = document.querySelector('#admin-confirm');
-  const {escape, blocks:parseMarkdown, source:markdownSource, render:renderMarkdown, fromDocument:readDocument, clipboardBlocks} = window.blogMarkdown;
+  const {escape, blocks:parseMarkdown, source:markdownSource, render:renderMarkdown, fromDocument:readDocument, clipboardBlocks, coverImage} = window.blogMarkdown;
   const labels = {posts:'文章',notes:'笔记',projects:'项目'};
-  const types = {p:'正文',h1:'一级标题',h2:'二级标题',h3:'三级标题',h4:'四级标题',h5:'五级标题',h6:'六级标题',ul:'无序列表',ol:'有序列表',quote:'引用',code:'代码块'};
+  const types = {p:'正文',h1:'一级标题',h2:'二级标题',h3:'三级标题',h4:'四级标题',h5:'五级标题',h6:'六级标题',ul:'无序列表',ol:'有序列表',quote:'引用',code:'代码块',table:'插入表格'};
+  const blockMarks = {p:'T',div:'T',ul:'•≡',ol:'1≡',quote:'❝',code:'‹›',table:'▦'};
   const input = (name, label, value, limit, type = 'text', required = true) => `<label class="admin-field">${label}<input name="${name}" type="${type}" value="${escape(value || '')}" maxlength="${limit}"${required ? ' required' : ''}></label>`;
   const textarea = (name, label, value, limit, required = true) => `<label class="admin-field">${label}<textarea name="${name}" maxlength="${limit}"${required ? ' required' : ''}>${escape(value || '')}</textarea></label>`;
   const select = (name, label, options, selected) => `<label class="admin-field">${label}<select name="${name}">${options.map(([value,text]) => `<option value="${escape(value)}"${value === selected ? ' selected' : ''}>${escape(text)}</option>`).join('')}</select></label>`;
@@ -182,7 +183,7 @@
     const articleOptions = [['','无关联'],...data.posts.map(post => [post.id,post.title])];
     const fields = isPost ? `${select('topic','文章主题',Object.entries(data.topics),item.topic || Object.keys(data.topics)[0])}${date}` : `${kind}${collection === 'notes' ? date : select('post','关联文章',articleOptions,item.post || '')}${status}`;
     const details = `${textarea('text','简短说明',item.text,350)}${textarea('detail',collection === 'notes' ? '笔记正文（Markdown）' : '项目详情（Markdown）',item.detail,8000,false)}${collection === 'projects' ? input('url','项目链接',item.url,300,'url',false) : ''}`;
-    const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<p class="draft-save-status subtle" role="status">${item.status === 'draft' ? '草稿已保存。' : '编辑后自动保存草稿。'}</p><details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}</details></div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
+    const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<p class="draft-save-status subtle" role="status">${item.status === 'draft' ? '草稿已保存。' : '编辑后自动保存草稿。'}</p><details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}<div class="admin-fields">${input('cover','封面图片地址',item.cover,500,'text',false)}${input('coverAlt','封面替代文字',item.coverAlt,150,'text',false)}</div></details></div><div class="editor-cover">${coverImage(item)}</div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
     const actions = isPost ? `<p class="subtle">${published ? '保存草稿后，读者仍看到已发布版本。' : '发布后，文章会出现在博客上。'}</p><button type="submit" class="secondary" name="status" value="draft">保存草稿</button><button type="submit" class="primary" name="status" value="published">${published ? '发布更新' : '发布文章'}</button>` : `<button type="submit" class="primary">保存${labels[collection]}</button>`;
     page.innerHTML = `<div class="admin-page-head"><div><button type="button" class="admin-back" id="return-list">返回${labels[collection]}列表</button><h2>${item.id ? '编辑' : '新建'}${labels[collection]}</h2></div>${published ? '<button type="button" class="secondary" id="withdraw-post">撤回发布</button>' : ''}</div>
       <form id="content-form" class="admin-editor"><div class="admin-card ${isPost ? 'document-card' : ''}">${editorFields}</div><div class="admin-save">${actions}</div></form>`;
@@ -199,6 +200,9 @@
     const editor = isPost ? articleEditor(form.querySelector('#article-editor'), item, scheduleDraft) : null;
     if (isPost) {
       trackForm(form,event => {
+        if (['cover','coverAlt'].includes(event.target.name)) {
+          form.querySelector('.editor-cover').innerHTML = coverImage({cover:form.elements.cover.value.trim(),coverAlt:form.elements.coverAlt.value.trim()});
+        }
         if (!event.target.closest('#article-editor')) scheduleDraft();
       });
     } else trackForm(form);
@@ -284,7 +288,7 @@
       ${legacy ? '<button type="button" class="secondary" data-restore>带入原浏览器草稿</button>' : ''}<div id="article-canvas"></div>`;
     const canvas = root.querySelector('#article-canvas');
     const exportButton = root.querySelector('[data-export]');
-    const typeButtons = Object.entries(types).filter(([type]) => !/^h[4-6]$/.test(type)).map(([type,label]) => `<button type="button" data-type="${type}">${label}</button>`).join('');
+    const typeButtons = Object.entries(types).map(([type,label]) => `<button type="button" data-type="${type}" aria-label="${label}" title="${label}">${blockMarks[type] || type.toUpperCase()}</button>`).join('');
     let documentEditor = null;
     let menu = null;
     let menuOptions = null;
@@ -345,13 +349,18 @@
         const command = button.dataset.format;
         button.setAttribute('aria-pressed',String(command === 'code' ? Boolean(inlineCodeAt(activeRange)) : document.queryCommandState(command)));
       }
-      selectionToolbar.querySelector('[data-format=code]').disabled = !block || block !== endBlock;
+      selectionToolbar.querySelector('[data-format=code]').disabled = !block || block !== endBlock ||
+        cellAt(activeRange.startContainer) !== cellAt(activeRange.endContainer);
+    }
+
+    function cellAt(node) {
+      return (node?.nodeType === 3 ? node.parentElement : node)?.closest?.('td,th');
     }
 
     function blockAt(node) {
       if (node?.nodeType === 3) node = node.parentElement;
       if (!node || node === documentEditor || !documentEditor?.contains(node)) return null;
-      const block = node.closest('li,pre,blockquote,h1,h2,h3,h4,h5,h6,p,div');
+      const block = node.closest('[data-block-type=table]') || node.closest('li,pre,blockquote,h1,h2,h3,h4,h5,h6,p,div');
       return block === documentEditor ? null : block;
     }
 
@@ -361,10 +370,15 @@
       menu.hidden = !block;
       if (!block) return;
       menu.style.top = `${block.getBoundingClientRect().top - documentEditor.getBoundingClientRect().top}px`;
-      const type = ({li:block.parentElement.localName,pre:'code',blockquote:'quote'})[block.localName] || block.localName;
-      const glyph = ({p:'¶',div:'¶',ul:'•',ol:'1.',code:'‹›',quote:'“'})[type] || type.toUpperCase();
+      const type = block.dataset.blockType || ({li:block.parentElement.localName,pre:'code',blockquote:'quote'})[block.localName] || block.localName;
+      const glyph = blockMarks[type] || type.toUpperCase();
       menu.querySelector('.block-type').textContent = glyph;
-      menu.querySelector('summary').setAttribute('aria-label',`当前块操作，${types[type] || '正文'}`);
+      menu.querySelector('summary').setAttribute('aria-label',`当前块操作，${type === 'table' ? '表格' : types[type] || '正文'}`);
+      for (const button of menu.querySelectorAll('[data-type]')) {
+        button.disabled = type === 'table' && button.dataset.type !== 'table';
+        button.classList.toggle('current-type',button.dataset.type === type);
+      }
+      menu.querySelector('.table-actions').hidden = type !== 'table';
       menu.querySelector('[data-action=up]').disabled = !block.previousElementSibling;
       menu.querySelector('[data-action=down]').disabled = !block.nextElementSibling;
       menu.querySelector('[data-action=remove]').disabled = false;
@@ -375,7 +389,10 @@
       if (!selection.rangeCount || !documentEditor?.contains(selection.anchorNode) || !documentEditor.contains(selection.focusNode)) return;
       activeRange = selection.getRangeAt(0).cloneRange();
       if (showHandle && !menu.open) {
-        const block = blockAt(activeRange.startContainer) || documentEditor.firstElementChild;
+        const {startContainer,startOffset} = activeRange;
+        const block = blockAt(startContainer) || (startContainer === documentEditor &&
+          (blockAt(documentEditor.childNodes[startOffset]) || blockAt(documentEditor.childNodes[startOffset - 1]))) ||
+          documentEditor.firstElementChild;
         positionMenu(block);
       }
     }
@@ -503,9 +520,9 @@
       if (mode === 'source') {
         canvas.innerHTML = `<label class="admin-field editor-source">Markdown 正文<textarea maxlength="180000">${escape(markdown)}</textarea></label>`;
       } else if (mode === 'preview') {
-        canvas.innerHTML = `<div class="editor-preview">${renderMarkdown(parseMarkdown(markdown)) || '<p class="subtle">还没有正文。</p>'}</div>`;
+        canvas.innerHTML = `<div class="editor-preview reading">${renderMarkdown(parseMarkdown(markdown),true) || '<p class="subtle">还没有正文。</p>'}</div>`;
       } else {
-        canvas.innerHTML = `<div class="document-workspace"><details class="block-menu" hidden><summary aria-label="当前块操作"><span class="block-type" aria-hidden="true">¶</span><span aria-hidden="true">⋮⋮</span></summary><div class="block-options"><p>块类型</p>${typeButtons}<p>格式</p><button type="button" data-command="bold">加粗</button><p>块操作</p><button type="button" data-action="add">在下方添加</button><button type="button" data-action="up" disabled>上移</button><button type="button" data-action="down" disabled>下移</button><button type="button" data-action="remove" disabled>删除此块</button></div></details><div class="document-editor" contenteditable="true" role="textbox" aria-label="文章正文" aria-multiline="true" spellcheck="false">${renderMarkdown(parseMarkdown(markdown)) || '<p><br></p>'}</div></div><p class="subtle editor-hint">指向正文块可打开左侧菜单，空白块也可以按 /。</p>`;
+        canvas.innerHTML = `<div class="document-workspace"><details class="block-menu" hidden><summary aria-label="当前块操作"><span class="block-type" aria-hidden="true">T</span><span aria-hidden="true">⋮⋮</span></summary><div class="block-options"><div class="block-type-grid" role="group" aria-label="块类型">${typeButtons}</div><div class="table-actions" hidden><button type="button" data-action="table-row">＋ 行</button><button type="button" data-action="table-column">＋ 列</button></div><p>格式</p><button type="button" data-command="bold">加粗</button><p>块操作</p><button type="button" data-action="add">在下方添加</button><button type="button" data-action="up" disabled>上移</button><button type="button" data-action="down" disabled>下移</button><button type="button" data-action="remove" disabled>删除此块</button></div></details><div class="document-editor reading" contenteditable="true" role="textbox" aria-label="文章正文" aria-multiline="true" spellcheck="false">${renderMarkdown(parseMarkdown(markdown)) || '<p><br></p>'}</div></div><p class="subtle editor-hint">指向正文块可打开左侧菜单，空白块也可以按 /。</p>`;
         documentEditor = canvas.querySelector('.document-editor');
         menu = canvas.querySelector('.block-menu');
         menuOptions = menu.querySelector('.block-options');
@@ -530,6 +547,16 @@
       }
     }
 
+    function appendTableRow(table) {
+      const row = table.tBodies[0].insertRow();
+      [...table.rows[0].cells].forEach(cell => {
+        const next = row.insertCell();
+        if (cell.dataset.align) next.dataset.align = cell.dataset.align;
+        next.append(document.createElement('br'));
+      });
+      return row.cells[0];
+    }
+
     function changeBlock(button, block) {
       hoverOpened = false;
       menu.open = false;
@@ -542,6 +569,20 @@
       documentEditor.focus();
       selectRange(range);
       const action = button.dataset.action;
+      if (action === 'table-row' || action === 'table-column') {
+        const table = block.querySelector('table');
+        if (action === 'table-row') placeCursor(appendTableRow(table));
+        else {
+          for (const row of table.rows) {
+            const cell = document.createElement(row.sectionRowIndex === 0 && row.parentElement === table.tHead ? 'th' : 'td');
+            if (cell.localName === 'th') cell.scope = 'col';
+            cell.append(document.createElement('br'));
+            row.append(cell);
+          }
+          placeCursor(table.rows[0].lastElementChild);
+        }
+        return;
+      }
       if (action === 'add' && block) {
         const after = block.localName === 'li' ? block.parentElement : block;
         const paragraph = document.createElement('p');
@@ -567,7 +608,13 @@
       }
 
       const type = button.dataset.type;
-      if (type === 'code' && block.localName !== 'pre') {
+      if (type === 'table') {
+        const after = block.localName === 'li' ? block.parentElement : block;
+        after.insertAdjacentHTML('afterend',renderMarkdown([{type:'table',rows:[['','',''],['','',''],['','','']],alignment:['---','---','---']}]));
+        const table = after.nextElementSibling;
+        if (block.localName === 'p' && !block.textContent.trim()) block.remove();
+        placeCursor(table.querySelector('th'));
+      } else if (type === 'code' && block.localName !== 'pre') {
         const code = document.createElement('code');
         code.textContent = block.innerText;
         const pre = document.createElement('pre');
@@ -619,6 +666,13 @@
           menu.open = false;
           trackSelection();
         }
+        return;
+      }
+      if ('copy' in button.dataset && canvas.contains(button)) {
+        try {
+          await navigator.clipboard.writeText(button.closest('.code-panel').querySelector('code').textContent);
+          button.textContent = '已复制';
+        } catch { button.textContent = '请手动复制'; }
         return;
       }
       if (button.dataset.mode) {
@@ -707,7 +761,7 @@
       event.preventDefault();
       applyEdit(() => {
         const current = blockAt(activeRange?.startContainer);
-        if (current?.closest('pre')) {
+        if (current?.closest('pre') || cellAt(activeRange?.startContainer)) {
           if (text) document.execCommand('insertText',false,text);
           return;
         }
@@ -767,6 +821,20 @@
     root.addEventListener('keydown', event => {
       if (event.isComposing || !documentEditor) return;
       const key = event.key.toLowerCase();
+      if (key === 'tab' && !event.altKey && !event.ctrlKey && !event.metaKey && documentEditor.contains(event.target)) {
+        const cell = cellAt(window.getSelection()?.anchorNode);
+        if (cell) {
+          const table = cell.closest('table');
+          const cells = [...table.querySelectorAll('th,td')];
+          const next = cells[cells.indexOf(cell) + (event.shiftKey ? -1 : 1)];
+          if (next || !event.shiftKey) {
+            event.preventDefault();
+            if (next) placeCursor(next);
+            else applyEdit(() => placeCursor(appendTableRow(table)));
+          }
+          return;
+        }
+      }
       const undo = key === 'z' && !event.shiftKey;
       const redo = key === 'y' || (key === 'z' && event.shiftKey);
       if ((event.ctrlKey || event.metaKey) && (undo || redo)) {
