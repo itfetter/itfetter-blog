@@ -2,10 +2,18 @@
   const page = document.querySelector('#admin-page');
   const feedback = document.querySelector('#admin-status');
   const confirmation = document.querySelector('#admin-confirm');
-  const {escape, blocks:parseMarkdown, source:markdownSource, render:renderMarkdown, fromDocument:readDocument, clipboardBlocks, coverImage} = window.blogMarkdown;
+  const {escape, blocks:parseMarkdown, source:markdownSource, render:renderMarkdown, fromDocument:readDocument, clipboardBlocks, coverImage, inkColors, highlightColors, schemeColor} = window.blogMarkdown;
   const labels = {posts:'文章',notes:'笔记',projects:'项目'};
-  const types = {p:'正文',h1:'一级标题',h2:'二级标题',h3:'三级标题',h4:'四级标题',h5:'五级标题',h6:'六级标题',ul:'无序列表',ol:'有序列表',quote:'引用',code:'代码块',table:'插入表格'};
-  const blockMarks = {p:'T',div:'T',ul:'•≡',ol:'1≡',quote:'❝',code:'‹›',table:'▦'};
+  const types = {p:'正文',h1:'一级标题',h2:'二级标题',h3:'三级标题',h4:'四级标题',h5:'五级标题',h6:'六级标题',ol:'有序列表',ul:'无序列表',quote:'引用',code:'代码块',table:'插入表格',callout:'高亮块'};
+  const blockMarks = {p:'T',div:'T',quote:'❝',code:'‹›',table:'▦',callout:'<span class="callout-mark" aria-hidden="true"></span>'};
+  const blockIcon = type => type === 'ul' || type === 'ol' ?
+    `<span class="list-mark" aria-hidden="true">${[1,2,3].map(number => `<span><i>${type === 'ol' ? number : '•'}</i></span>`).join('')}</span>` :
+    blockMarks[type] || escape(type.toUpperCase());
+  const colorLabels = {gray:'灰色',red:'红色',orange:'橙色',yellow:'黄色',green:'绿色',blue:'蓝色',purple:'紫色'};
+  const swatches = (kind,colors,label) => [['default',''],...Object.entries(colors)].map(([name,value]) => {
+    const title = `${label}：${colorLabels[name] || (kind === 'ink' ? '默认' : '无')}`;
+    return `<button type="button" class="color-swatch" data-color-kind="${kind}" data-color="${name}" aria-label="${title}" title="${title}"${value ? ` style="--swatch:${schemeColor(value)}"` : ''}>${kind === 'ink' ? 'A' : ''}</button>`;
+  }).join('');
   const input = (name, label, value, limit, type = 'text', required = true) => `<label class="admin-field">${label}<input name="${name}" type="${type}" value="${escape(value || '')}" maxlength="${limit}"${required ? ' required' : ''}></label>`;
   const textarea = (name, label, value, limit, required = true) => `<label class="admin-field">${label}<textarea name="${name}" maxlength="${limit}"${required ? ' required' : ''}>${escape(value || '')}</textarea></label>`;
   const select = (name, label, options, selected) => `<label class="admin-field">${label}<select name="${name}">${options.map(([value,text]) => `<option value="${escape(value)}"${value === selected ? ' selected' : ''}>${escape(text)}</option>`).join('')}</select></label>`;
@@ -288,11 +296,17 @@
       ${legacy ? '<button type="button" class="secondary" data-restore>带入原浏览器草稿</button>' : ''}<div id="article-canvas"></div>`;
     const canvas = root.querySelector('#article-canvas');
     const exportButton = root.querySelector('[data-export]');
-    const typeButtons = Object.entries(types).map(([type,label]) => `<button type="button" data-type="${type}" aria-label="${label}" title="${label}">${blockMarks[type] || type.toUpperCase()}</button>`).join('');
+    const typeButtons = Object.entries(types).map(([type,label]) => `<button type="button" data-type="${type}" aria-label="${label}" title="${label}">${blockIcon(type)}</button>`).join('');
     let documentEditor = null;
     let menu = null;
     let menuOptions = null;
     let selectionToolbar = null;
+    let colorPalette = null;
+    let tablePicker = null;
+    let tableTools = null;
+    let tableMenu = null;
+    let activeTable = null;
+    let tableTarget = null;
     let menuBlock = null;
     let hoverOpened = false;
 
@@ -324,9 +338,26 @@
       return code?.contains(range.endContainer) ? code : null;
     }
 
+    function showColorPalette(show) {
+      colorPalette.hidden = !show;
+      const trigger = selectionToolbar.querySelector('[data-color-toggle]');
+      trigger.setAttribute('aria-expanded',String(show));
+      if (!show) return;
+      const bounds = trigger.getBoundingClientRect();
+      const {width,height} = colorPalette.getBoundingClientRect();
+      const topEdge = adminHeader.getBoundingClientRect().bottom + 8;
+      const bottomEdge = window.innerHeight - 8;
+      const below = bounds.bottom + 9;
+      const above = bounds.top - height - 9;
+      const top = below + height <= bottomEdge || above < topEdge ? below : above;
+      colorPalette.style.left = `${Math.max(8,Math.min(bounds.right - width,document.documentElement.clientWidth - width - 8))}px`;
+      colorPalette.style.top = `${Math.max(topEdge,Math.min(top,bottomEdge - height))}px`;
+    }
+
     function positionSelectionToolbar() {
       if (!activeRange || activeRange.collapsed || !activeRange.toString().trim() || menu.open) {
         selectionToolbar.hidden = true;
+        showColorPalette(false);
         return;
       }
       const block = blockAt(activeRange.startContainer);
@@ -336,6 +367,7 @@
       if (block?.closest('pre') || endBlock?.closest('pre') || !rangeBounds.width ||
           rangeBounds.bottom < topEdge || rangeBounds.top >= window.innerHeight) {
         selectionToolbar.hidden = true;
+        showColorPalette(false);
         return;
       }
       selectionToolbar.hidden = false;
@@ -345,12 +377,13 @@
       const below = rangeBounds.bottom + 8;
       selectionToolbar.style.left = `${Math.max(8,Math.min(rangeBounds.left,right))}px`;
       selectionToolbar.style.top = `${Math.max(topEdge,Math.min(above >= topEdge ? above : below,window.innerHeight - height - 8))}px`;
-      for (const button of selectionToolbar.querySelectorAll('button')) {
+      for (const button of selectionToolbar.querySelectorAll('[data-format]')) {
         const command = button.dataset.format;
         button.setAttribute('aria-pressed',String(command === 'code' ? Boolean(inlineCodeAt(activeRange)) : document.queryCommandState(command)));
       }
       selectionToolbar.querySelector('[data-format=code]').disabled = !block || block !== endBlock ||
         cellAt(activeRange.startContainer) !== cellAt(activeRange.endContainer);
+      if (!colorPalette.hidden) showColorPalette(true);
     }
 
     function cellAt(node) {
@@ -360,7 +393,7 @@
     function blockAt(node) {
       if (node?.nodeType === 3) node = node.parentElement;
       if (!node || node === documentEditor || !documentEditor?.contains(node)) return null;
-      const block = node.closest('[data-block-type=table]') || node.closest('li,pre,blockquote,h1,h2,h3,h4,h5,h6,p,div');
+      const block = node.closest('[data-block-type=table],[data-block-type=callout]') || node.closest('li,pre,blockquote,h1,h2,h3,h4,h5,h6,p,div');
       return block === documentEditor ? null : block;
     }
 
@@ -368,17 +401,16 @@
       if (menuBlock !== block) menuBlock?.classList.remove('block-menu-target');
       menuBlock = block;
       menu.hidden = !block;
+      positionTableTools(block?.matches('[data-block-type=table]') ? block : null);
       if (!block) return;
       menu.style.top = `${block.getBoundingClientRect().top - documentEditor.getBoundingClientRect().top}px`;
       const type = block.dataset.blockType || ({li:block.parentElement.localName,pre:'code',blockquote:'quote'})[block.localName] || block.localName;
-      const glyph = blockMarks[type] || type.toUpperCase();
-      menu.querySelector('.block-type').textContent = glyph;
+      menu.querySelector('.block-type').innerHTML = blockIcon(type);
       menu.querySelector('summary').setAttribute('aria-label',`当前块操作，${type === 'table' ? '表格' : types[type] || '正文'}`);
       for (const button of menu.querySelectorAll('[data-type]')) {
-        button.disabled = type === 'table' && button.dataset.type !== 'table';
+        button.disabled = type === 'table';
         button.classList.toggle('current-type',button.dataset.type === type);
       }
-      menu.querySelector('.table-actions').hidden = type !== 'table';
       menu.querySelector('[data-action=up]').disabled = !block.previousElementSibling;
       menu.querySelector('[data-action=down]').disabled = !block.nextElementSibling;
       menu.querySelector('[data-action=remove]').disabled = false;
@@ -405,15 +437,100 @@
         positionSelectionToolbar();
       } else {
         selectionToolbar.hidden = true;
+        showColorPalette(false);
       }
     }, {signal});
     function positionOverlays() {
       if (!documentEditor) return;
       if (menu.open) positionBlockOptions();
       if (!selectionToolbar.hidden) positionSelectionToolbar();
+      if (activeTable) positionTableTools(activeTable);
     }
     window.addEventListener('scroll',positionOverlays,{signal,passive:true});
     window.addEventListener('resize',positionOverlays,{signal});
+    canvas.addEventListener('scroll',positionOverlays,{capture:true,passive:true});
+
+    function paintTableSize(choice) {
+      const row = Number(choice.dataset.rows);
+      const column = Number(choice.dataset.columns);
+      tablePicker.querySelector('output').value = `${row} 行 × ${column} 列`;
+      for (const tile of tablePicker.querySelectorAll('[data-rows]')) {
+        tile.classList.toggle('picked',Number(tile.dataset.rows) <= row && Number(tile.dataset.columns) <= column);
+        tile.tabIndex = tile === choice ? 0 : -1;
+      }
+    }
+
+    function closeTableMenu() {
+      tableMenu.hidden = true;
+      tableTarget?.setAttribute('aria-expanded','false');
+      tableTarget = null;
+      tableTools.querySelector('.table-guide').hidden = true;
+    }
+
+    function positionTableTools(block, rebuild = false) {
+      if (!tableTools || !tableMenu) return;
+      const changed = block !== activeTable;
+      activeTable = block?.isConnected ? block : null;
+      tableTools.hidden = !activeTable;
+      if (changed || !activeTable || rebuild) closeTableMenu();
+      if (!activeTable) return;
+      const table = activeTable.querySelector('table');
+      const columns = [...table.rows[0].cells];
+      const rows = [...table.rows];
+      if (changed || rebuild || tableTools.querySelectorAll('button').length !== rows.length + columns.length) {
+        for (const [axis,items,label] of [['column',columns,'列'],['row',rows,'行']]) {
+          tableTools.querySelector(`[data-rail=${axis}]`).innerHTML = items.map((_,index) =>
+            `<button type="button" data-axis="${axis}" data-index="${index}" aria-controls="table-axis-menu" aria-expanded="false" aria-label="第 ${index + 1} ${label}操作" title="第 ${index + 1} ${label}操作"></button>`).join('');
+        }
+      }
+      const origin = tableTools.getBoundingClientRect();
+      const bounds = activeTable.getBoundingClientRect();
+      for (const button of tableTools.querySelectorAll('button')) {
+        const column = button.dataset.axis === 'column';
+        const rect = (column ? columns : rows)[button.dataset.index].getBoundingClientRect();
+        const x = column ? (rect.left + rect.right) / 2 : bounds.left - 9;
+        button.hidden = column && (x < bounds.left || x >= bounds.right);
+        button.style.left = `${x - origin.left}px`;
+        button.style.top = `${(column ? bounds.top - 10 : (rect.top + rect.bottom) / 2) - origin.top}px`;
+      }
+      if (tableTarget) {
+        if (tableTarget.hidden) closeTableMenu();
+        else positionTableMenu();
+      }
+    }
+
+    function positionTableMenu() {
+      const anchor = tableTarget.getBoundingClientRect();
+      const rect = tableMenu.getBoundingClientRect();
+      const topEdge = adminHeader.getBoundingClientRect().bottom + 8;
+      const bottomEdge = window.innerHeight - 8;
+      if (anchor.bottom < topEdge || anchor.top > bottomEdge) {
+        closeTableMenu();
+        return;
+      }
+      const top = anchor.bottom + rect.height <= bottomEdge ? anchor.bottom : anchor.top - rect.height;
+      tableMenu.style.top = `${Math.max(topEdge,top)}px`;
+      tableMenu.style.left = `${Math.max(8,Math.min(anchor.left,document.documentElement.clientWidth - rect.width - 8))}px`;
+      tableGuide(tableTarget);
+    }
+
+    function tableGuide(button) {
+      const guide = tableTools.querySelector('.table-guide');
+      guide.hidden = !button;
+      if (!button) return;
+      const table = activeTable.querySelector('table');
+      const column = button.dataset.axis === 'column';
+      const index = Number(button.dataset.index);
+      const target = (column ? table.rows[0].cells[index] : table.rows[index]).getBoundingClientRect();
+      const bounds = activeTable.getBoundingClientRect();
+      const origin = tableTools.getBoundingClientRect();
+      const left = column ? Math.max(target.left,bounds.left) : bounds.left;
+      const top = column ? bounds.top : target.top;
+      guide.style.left = `${left - origin.left}px`;
+      guide.style.top = `${top - origin.top}px`;
+      guide.style.width = `${(column ? Math.min(target.right,bounds.right) : bounds.right) - left}px`;
+      guide.style.height = `${(column ? bounds.bottom : target.bottom) - top}px`;
+    }
 
     function sync() {
       markdown = markdownSource(readDocument(documentEditor));
@@ -513,6 +630,8 @@
       exportButton.disabled = !markdown.trim();
       documentEditor = null;
       menuBlock = null;
+      activeTable = null;
+      tableTarget = null;
       hoverOpened = false;
       activeRange = null;
       beforeInput = null;
@@ -522,24 +641,47 @@
       } else if (mode === 'preview') {
         canvas.innerHTML = `<div class="editor-preview reading">${renderMarkdown(parseMarkdown(markdown),true) || '<p class="subtle">还没有正文。</p>'}</div>`;
       } else {
-        canvas.innerHTML = `<div class="document-workspace"><details class="block-menu" hidden><summary aria-label="当前块操作"><span class="block-type" aria-hidden="true">T</span><span aria-hidden="true">⋮⋮</span></summary><div class="block-options"><div class="block-type-grid" role="group" aria-label="块类型">${typeButtons}</div><div class="table-actions" hidden><button type="button" data-action="table-row">＋ 行</button><button type="button" data-action="table-column">＋ 列</button></div><p>格式</p><button type="button" data-command="bold">加粗</button><p>块操作</p><button type="button" data-action="add">在下方添加</button><button type="button" data-action="up" disabled>上移</button><button type="button" data-action="down" disabled>下移</button><button type="button" data-action="remove" disabled>删除此块</button></div></details><div class="document-editor reading" contenteditable="true" role="textbox" aria-label="文章正文" aria-multiline="true" spellcheck="false">${renderMarkdown(parseMarkdown(markdown)) || '<p><br></p>'}</div></div><p class="subtle editor-hint">指向正文块可打开左侧菜单，空白块也可以按 /。</p>`;
+        canvas.innerHTML = `<div class="document-workspace"><details class="block-menu" hidden><summary aria-label="当前块操作"><span class="block-type" aria-hidden="true">T</span><span aria-hidden="true">⋮⋮</span></summary><div class="block-options"><div class="block-type-grid" role="group" aria-label="块类型">${typeButtons}</div><p>格式</p><button type="button" data-command="bold">加粗</button><p>块操作</p><button type="button" data-action="add">在下方添加</button><button type="button" data-action="up" disabled>上移</button><button type="button" data-action="down" disabled>下移</button><button type="button" data-action="remove" disabled>删除此块</button>
+          <div class="table-picker" hidden><div class="table-picker-head"><button type="button" data-table-back aria-label="返回块类型">←</button><span>插入表格</span><output></output></div><div class="table-size-grid" role="group" aria-label="选择表格行列数">
+            ${Array.from({length:64},(_,i) => {
+              const rows = Math.floor(i / 8) + 1;
+              const columns = i % 8 + 1;
+              return `<button type="button" data-rows="${rows}" data-columns="${columns}" aria-label="${rows} 行 ${columns} 列" tabindex="-1"></button>`;
+            }).join('')}
+          </div></div></div></details>
+          <div class="document-editor reading" contenteditable="true" role="textbox" aria-label="文章正文" aria-multiline="true" spellcheck="false">${renderMarkdown(parseMarkdown(markdown)) || '<p><br></p>'}</div>
+          <div class="table-tools" hidden><div class="table-guide" hidden></div><div data-rail="column" role="group" aria-label="表格列操作"></div><div data-rail="row" role="group" aria-label="表格行操作"></div></div>
+          <div id="table-axis-menu" class="table-axis-menu" role="group" aria-label="表格行列操作" hidden><button type="button" data-axis-action="before"></button><button type="button" data-axis-action="after"></button><button type="button" data-axis-action="delete"></button></div>
+          </div><p class="subtle editor-hint">指向正文块可打开左侧菜单，空白块也可以按 /。</p>`;
         documentEditor = canvas.querySelector('.document-editor');
         menu = canvas.querySelector('.block-menu');
         menuOptions = menu.querySelector('.block-options');
+        tablePicker = menuOptions.querySelector('.table-picker');
+        tableTools = canvas.querySelector('.table-tools');
+        tableMenu = canvas.querySelector('.table-axis-menu');
         selectionToolbar = document.createElement('div');
         selectionToolbar.className = 'selection-toolbar';
         selectionToolbar.hidden = true;
         selectionToolbar.setAttribute('role','group');
         selectionToolbar.setAttribute('aria-label','选中文字格式');
         selectionToolbar.innerHTML = '<button type="button" data-format="bold" aria-label="加粗" title="加粗"><b>B</b></button><button type="button" data-format="italic" aria-label="斜体" title="斜体"><i>I</i></button><button type="button" data-format="strikeThrough" aria-label="删除线" title="删除线"><s>S</s></button><button type="button" data-format="code" aria-label="行内代码" title="行内代码">&lt;/&gt;</button>';
+        selectionToolbar.insertAdjacentHTML('beforeend',`<button type="button" class="color-trigger" data-color-toggle aria-label="文字颜色" title="文字颜色" aria-expanded="false" aria-controls="selection-colors"><span aria-hidden="true">A</span><i aria-hidden="true"></i></button>
+          <div id="selection-colors" class="color-palette" role="group" aria-label="文字配色" hidden>
+            <div>字体颜色</div><div class="color-swatches">${swatches('ink',inkColors,'字体颜色')}</div>
+            <div>背景颜色</div><div class="color-swatches">${swatches('highlight',highlightColors,'背景颜色')}</div>
+            <button type="button" class="color-reset" data-color-reset>恢复默认</button>
+          </div>`);
+        colorPalette = selectionToolbar.querySelector('.color-palette');
         documentEditor.after(selectionToolbar);
         menu.addEventListener('toggle', event => {
           if (event.currentTarget !== menu) return;
           menuBlock?.classList.toggle('block-menu-target',menu.open);
           if (menu.open) {
             selectionToolbar.hidden = true;
+            showColorPalette(false);
+            closeTableMenu();
             positionBlockOptions();
-          }
+          } else tablePicker.hidden = true;
         });
         if (savedDocument?.markdown === markdown) documentEditor.innerHTML = savedDocument.html;
         else if (savedDocument) record(savedDocument);
@@ -547,14 +689,70 @@
       }
     }
 
-    function appendTableRow(table) {
-      const row = table.tBodies[0].insertRow();
+    function insertTableRow(table, index = table.rows.length) {
+      const row = table.tBodies[0].insertRow(index - 1);
       [...table.rows[0].cells].forEach(cell => {
         const next = row.insertCell();
         if (cell.dataset.align) next.dataset.align = cell.dataset.align;
         next.append(document.createElement('br'));
       });
       return row.cells[0];
+    }
+
+    function changeTable(axis, index, action) {
+      const block = activeTable;
+      const table = block.querySelector('table');
+      const after = action === 'after' ? 1 : 0;
+      let target;
+      if (axis === 'column') {
+        for (const row of table.rows) {
+          if (action === 'delete') row.deleteCell(index);
+          else {
+            const cell = document.createElement(row === table.rows[0] ? 'th' : 'td');
+            if (cell.localName === 'th') cell.scope = 'col';
+            cell.append(document.createElement('br'));
+            row.insertBefore(cell,row.cells[index + after] || null);
+          }
+        }
+        target = table.rows[0].cells[Math.min(index + after,table.rows[0].cells.length - 1)];
+      } else if (action === 'delete' && index) {
+        table.deleteRow(index);
+        target = table.rows[Math.min(index,table.rows.length - 1)].cells[0];
+      } else if (action === 'delete') {
+        const header = table.rows[0];
+        const firstRow = table.rows[1];
+        [...header.cells].forEach((cell,i) => cell.replaceChildren(...firstRow.cells[i].childNodes));
+        firstRow.remove();
+        target = header.cells[0];
+      } else if (index || after) {
+        target = insertTableRow(table,index + after);
+      } else {
+        const header = table.rows[0];
+        const firstRow = insertTableRow(table,1).parentElement;
+        [...header.cells].forEach((cell,i) => {
+          firstRow.cells[i].replaceChildren(...cell.childNodes);
+          cell.append(document.createElement('br'));
+        });
+        target = header.cells[0];
+      }
+      closeTableMenu();
+      placeCursor(target);
+      positionTableTools(block,true);
+    }
+
+    function replaceBlock(block, replacement) {
+      if (block.localName !== 'li') {
+        block.replaceWith(replacement);
+        return;
+      }
+      const list = block.parentElement;
+      const rest = list.cloneNode(false);
+      if (list.localName === 'ol') rest.start = list.start + [...list.children].indexOf(block) + 1;
+      while (block.nextElementSibling) rest.append(block.nextElementSibling);
+      list.after(replacement);
+      if (rest.children.length) replacement.after(rest);
+      block.remove();
+      if (!list.children.length) list.remove();
     }
 
     function changeBlock(button, block) {
@@ -569,20 +767,6 @@
       documentEditor.focus();
       selectRange(range);
       const action = button.dataset.action;
-      if (action === 'table-row' || action === 'table-column') {
-        const table = block.querySelector('table');
-        if (action === 'table-row') placeCursor(appendTableRow(table));
-        else {
-          for (const row of table.rows) {
-            const cell = document.createElement(row.sectionRowIndex === 0 && row.parentElement === table.tHead ? 'th' : 'td');
-            if (cell.localName === 'th') cell.scope = 'col';
-            cell.append(document.createElement('br'));
-            row.append(cell);
-          }
-          placeCursor(table.rows[0].lastElementChild);
-        }
-        return;
-      }
       if (action === 'add' && block) {
         const after = block.localName === 'li' ? block.parentElement : block;
         const paragraph = document.createElement('p');
@@ -607,10 +791,31 @@
         return;
       }
 
-      const type = button.dataset.type;
+      const type = button.dataset.rows ? 'table' : button.dataset.type;
+      if (type === 'callout') {
+        if (block.dataset.blockType !== 'callout') {
+          const callout = document.createElement('div');
+          callout.className = 'markdown-callout';
+          callout.dataset.blockType = 'callout';
+          if (block.localName === 'pre') callout.textContent = block.innerText;
+          else callout.append(...block.childNodes);
+          replaceBlock(block,callout);
+          placeCursor(callout,false);
+        }
+        return;
+      }
+      if (block.dataset.blockType === 'callout' && type && type !== 'table' && type !== 'code') {
+        const paragraph = document.createElement('p');
+        paragraph.append(...block.childNodes);
+        block.replaceWith(paragraph);
+        placeCursor(paragraph);
+        block = paragraph;
+      }
       if (type === 'table') {
         const after = block.localName === 'li' ? block.parentElement : block;
-        after.insertAdjacentHTML('afterend',renderMarkdown([{type:'table',rows:[['','',''],['','',''],['','','']],alignment:['---','---','---']}]));
+        const width = Number(button.dataset.columns);
+        const rows = Array.from({length:Number(button.dataset.rows)},() => Array(width).fill(''));
+        after.insertAdjacentHTML('afterend',renderMarkdown([{type:'table',rows,alignment:Array(width).fill('---')}]));
         const table = after.nextElementSibling;
         if (block.localName === 'p' && !block.textContent.trim()) block.remove();
         placeCursor(table.querySelector('th'));
@@ -625,16 +830,7 @@
         const start = prefix.toString().length;
         prefix.setEnd(range.endContainer,range.endOffset);
         const end = prefix.toString().length;
-        if (block.localName === 'li') {
-          const list = block.parentElement;
-          const rest = list.cloneNode(false);
-          if (list.localName === 'ol') rest.start = list.start + [...list.children].indexOf(block) + 1;
-          while (block.nextElementSibling) rest.append(block.nextElementSibling);
-          list.after(pre);
-          if (rest.children.length) pre.after(rest);
-          block.remove();
-          if (!list.children.length) list.remove();
-        } else block.replaceWith(pre);
+        replaceBlock(block,pre);
         if (code.firstChild) {
           range.setStart(code.firstChild,Math.min(start,code.textContent.length));
           range.setEnd(code.firstChild,Math.min(end,code.textContent.length));
@@ -688,11 +884,71 @@
         paint();
       } else if ('export' in button.dataset) {
         download(`${item.id || 'itfetter-draft'}.md`,markdown,'text/markdown;charset=utf-8');
+      } else if (button.dataset.axis) {
+        if (tableTarget === button) {
+          closeTableMenu();
+          return;
+        }
+        closeTableMenu();
+        menu.open = false;
+        selectionToolbar.hidden = true;
+        showColorPalette(false);
+        tableTarget = button;
+        const row = button.dataset.axis === 'row';
+        const table = activeTable.querySelector('table');
+        const label = row ? '行' : '列';
+        const [before,after,remove] = tableMenu.querySelectorAll('button');
+        before.textContent = `在${row ? '上方' : '左侧'}插入${label}`;
+        after.textContent = `在${row ? '下方' : '右侧'}插入${label}`;
+        remove.textContent = `删除此${label}`;
+        remove.disabled = (row ? table.rows.length : table.rows[0].cells.length) === 1;
+        remove.title = remove.disabled ? `表格至少保留一${label}` : '';
+        tableMenu.hidden = false;
+        button.setAttribute('aria-expanded','true');
+        positionTableMenu();
+        if (event.detail === 0 && !tableMenu.hidden) before.focus();
+      } else if (button.dataset.axisAction && tableTarget) {
+        const {axis,index} = tableTarget.dataset;
+        applyEdit(() => changeTable(axis,Number(index),button.dataset.axisAction));
       } else if (menu?.contains(button)) {
         const block = menuBlock;
+        if (button.dataset.type === 'table') {
+          hoverOpened = false;
+          tablePicker.hidden = false;
+          const choice = tablePicker.querySelector('[data-rows="3"][data-columns="3"]');
+          paintTableSize(choice);
+          positionBlockOptions();
+          if (event.detail === 0) choice.focus();
+          return;
+        }
+        if ('tableBack' in button.dataset) {
+          tablePicker.hidden = true;
+          positionBlockOptions();
+          menuOptions.querySelector('[data-type=table]').focus();
+          return;
+        }
         if (button.dataset.action === 'remove' && block?.textContent.trim() &&
             !await confirmAction('删除正文块？','可以在编辑器中撤销这次删除。','删除正文块',true)) return;
         applyEdit(() => changeBlock(button,block));
+      } else if ('colorToggle' in button.dataset) {
+        showColorPalette(colorPalette.hidden);
+        if (!colorPalette.hidden && event.detail === 0) colorPalette.querySelector('button').focus();
+      } else if ((button.dataset.colorKind || 'colorReset' in button.dataset) && activeRange) {
+        const {colorKind,color} = button.dataset;
+        const swatch = getComputedStyle(button);
+        const ink = color && color !== 'default' ? swatch.color : getComputedStyle(documentEditor).color;
+        const background = color && color !== 'default' ? swatch.backgroundColor : 'transparent';
+        const range = activeRange.cloneRange();
+        documentEditor.focus();
+        selectRange(range);
+        applyEdit(() => {
+          document.execCommand('styleWithCSS',false,true);
+          if (!colorKind || colorKind === 'ink') document.execCommand('foreColor',false,ink);
+          if (!colorKind || colorKind === 'highlight') document.execCommand('hiliteColor',false,background);
+          document.execCommand('styleWithCSS',false,false);
+        });
+        showColorPalette(false);
+        positionSelectionToolbar();
       } else if (button.dataset.format && activeRange) {
         const range = activeRange.cloneRange();
         documentEditor.focus();
@@ -790,6 +1046,10 @@
       if (block && block !== menuBlock) positionMenu(block);
     });
     canvas.addEventListener('pointerover', event => {
+      const choice = event.target.closest('[data-rows]');
+      if (choice && event.pointerType !== 'touch') paintTableSize(choice);
+      const axis = event.target.closest('[data-axis]');
+      if (axis && !tableTarget && !menu.open) tableGuide(axis);
       if (event.pointerType === 'touch' || !menuBlock || menu.open || !menu.contains(event.target) || !event.target.closest('summary')) return;
       trackSelection(false);
       menu.open = true;
@@ -797,6 +1057,7 @@
       hoverOpened = true;
     });
     canvas.addEventListener('pointerout', event => {
+      if (event.target.closest('[data-axis]') && !tableTarget) tableGuide(null);
       if (hoverOpened && menu.contains(event.target) && !menu.contains(event.relatedTarget)) {
         hoverOpened = false;
         menu.open = false;
@@ -807,12 +1068,16 @@
       }
     });
     canvas.addEventListener('mousedown', event => {
-      if ((menu?.contains(event.target) || selectionToolbar?.contains(event.target)) && event.button === 0) {
+      if ((menu?.contains(event.target) || selectionToolbar?.contains(event.target) ||
+           tableTools?.contains(event.target) || tableMenu?.contains(event.target)) && event.button === 0) {
         trackSelection(false);
-        // Keep the browser's text selection while the pointer operates the block menu.
+        // Keep the browser's text selection while the pointer operates either toolbar.
         event.preventDefault();
       }
     });
+    document.addEventListener('pointerdown',event => {
+      if (tableTarget && !tableTools.contains(event.target) && !tableMenu.contains(event.target)) closeTableMenu();
+    },{signal});
     for (const eventType of ['focusin','keyup','pointerup']) {
       canvas.addEventListener(eventType, event => {
         if (documentEditor?.contains(event.target)) trackSelection();
@@ -821,6 +1086,19 @@
     root.addEventListener('keydown', event => {
       if (event.isComposing || !documentEditor) return;
       const key = event.key.toLowerCase();
+      const tile = event.target.closest('[data-rows]');
+      const gridMovement = {arrowup:[-1,0],arrowdown:[1,0],arrowleft:[0,-1],arrowright:[0,1]}[key];
+      if (tile && gridMovement) {
+        event.preventDefault();
+        const row = Number(tile.dataset.rows) + gridMovement[0];
+        const column = Number(tile.dataset.columns) + gridMovement[1];
+        const choice = tablePicker.querySelector(`[data-rows="${row}"][data-columns="${column}"]`);
+        if (choice) {
+          paintTableSize(choice);
+          choice.focus();
+        }
+        return;
+      }
       if (key === 'tab' && !event.altKey && !event.ctrlKey && !event.metaKey && documentEditor.contains(event.target)) {
         const cell = cellAt(window.getSelection()?.anchorNode);
         if (cell) {
@@ -830,7 +1108,7 @@
           if (next || !event.shiftKey) {
             event.preventDefault();
             if (next) placeCursor(next);
-            else applyEdit(() => placeCursor(appendTableRow(table)));
+            else applyEdit(() => placeCursor(insertTableRow(table)));
           }
           return;
         }
@@ -849,6 +1127,15 @@
           positionBlockOptions();
           menu.querySelector('button').focus();
         }
+      } else if (event.key === 'Escape' && tableTarget) {
+        event.preventDefault();
+        tableTarget.focus();
+        closeTableMenu();
+      } else if (event.key === 'Escape' && !tablePicker.hidden) {
+        event.preventDefault();
+        tablePicker.hidden = true;
+        positionBlockOptions();
+        menuOptions.querySelector('[data-type=table]').focus();
       } else if (event.key === 'Escape' && menu.open && activeRange) {
         hoverOpened = false;
         menu.open = false;
@@ -856,8 +1143,19 @@
         selectRange(activeRange);
       } else if (event.key === 'Escape' && !selectionToolbar.hidden) {
         event.preventDefault();
-        selectionToolbar.hidden = true;
-        documentEditor.focus();
+        if (!colorPalette.hidden) {
+          showColorPalette(false);
+          selectionToolbar.querySelector('[data-color-toggle]').focus();
+        } else {
+          selectionToolbar.hidden = true;
+          documentEditor.focus();
+        }
+      } else if (event.key === 'Escape' && activeTable && documentEditor.contains(event.target)) {
+        const cell = cellAt(window.getSelection()?.anchorNode);
+        if (cell) {
+          event.preventDefault();
+          tableTools.querySelector(`[data-axis=row][data-index="${cell.parentElement.rowIndex}"]`).focus();
+        }
       }
     });
     paint();

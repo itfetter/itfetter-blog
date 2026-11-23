@@ -28,11 +28,12 @@ def read_content():
             if "cover" in original:
                 version.setdefault("cover", original["cover"])
                 version.setdefault("coverAlt", original["coverAlt"])
-            if post["id"] == "working-with-coding-agents":
-                old_body, _, table = original["body"].partition("\n\n文章列表验收示例\n\n")
+            if post["id"] == "working-with-coding-agents" and version.get("sample", True):
+                caption = "\n\n文章列表验收示例\n\n"
+                old_body, _, table = original["body"].partition(caption)
                 last_paragraph = old_body.rsplit("\n\n", 1)[-1]
-                if last_paragraph in version["body"] and "| 检查项 | 怎么验证 | 期望结果 |" not in version["body"]:
-                    version["body"] = version["body"].replace(last_paragraph, f"{last_paragraph}\n\n文章列表验收示例\n\n{table}", 1)
+                if last_paragraph in version["body"] and caption not in version["body"]:
+                    version["body"] = version["body"].replace(last_paragraph, last_paragraph + caption + table, 1)
     return data
 
 

@@ -1,5 +1,15 @@
 (() => {
   const escape = text => text.replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
+  const inkColors = {gray:['#626d7e','#bbc5d4'],red:['#bc454b','#ff9a9d'],orange:['#a95a18','#ffb380'],green:['#327641','#96d49d'],blue:['#3565bc','#abc5ff'],purple:['#8651b8','#d5b6fa']};
+  const highlightColors = {gray:['#e6e9ee','#343c49'],red:['#fbd8da','#512c36'],orange:['#ffe1c0','#543825'],yellow:['#fff1a8','#48401e'],green:['#d4efcc','#274635'],blue:['#d7e5ff','#2b3d60'],purple:['#eadbff','#413151']};
+  const schemeColor = colors => `light-dark(${colors.join(', ')})`;
+
+  function colorName(value, colors) {
+    value = value.match(/^light-dark\((#[\da-f]{6}|rgb\([^)]+\))/i)?.[1] || value;
+    const rgb = value.match(/^rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)$/);
+    const hex = rgb ? '#' + rgb.slice(1).map(part => Number(part).toString(16).padStart(2,'0')).join('') : value.toLowerCase();
+    return Object.keys(colors).find(name => colors[name].includes(hex));
+  }
 
   function tableCells(line) {
     return line.trim().replace(/^\|/,'').replace(/(?<!\\)\|$/,'')
@@ -52,18 +62,20 @@
         body.push(pattern ? next.replace(pattern,'') : next);
         i++;
       }
-      result.push({type,text:body.join('\n'),...(type === 'ol' ? {start:Number.parseInt(marker[1],10)} : {})});
+      if (type === 'quote' && /^\[!NOTE\]$/i.test(body[0].trim())) result.push({type:'callout',text:body.slice(1).join('\n')});
+      else result.push({type,text:body.join('\n'),...(type === 'ol' ? {start:Number.parseInt(marker[1],10)} : {})});
     }
     return result;
   }
 
   function source(blocks) {
-    return blocks.filter(block => block.type === 'table' || block.text.trim()).map(({type,text,language,start = 1,rows,alignment}) => {
+    return blocks.filter(block => ['table','callout'].includes(block.type) || block.text.trim()).map(({type,text,language,start = 1,rows,alignment}) => {
       if (type === 'table') {
         const row = cells => `| ${cells.map(cell => cell.replaceAll('|','\\|').replaceAll('\n','<br>')).join(' | ')} |`;
         return [row(rows[0]),row(alignment),...rows.slice(1).map(row)].join('\n');
       }
       if (type === 'code') return `\`\`\`${language || ''}\n${text}\n\`\`\``;
+      if (type === 'callout') return text ? ['> [!NOTE]',...text.split('\n').map(line => `> ${line}`)].join('\n') : '> [!NOTE]';
       if (/^h[1-6]$/.test(type)) return `${'#'.repeat(Number(type[1]))} ${text}`;
       if (type === 'quote' || type === 'ul' || type === 'ol') {
         return text.split('\n').map((line, i) => `${type === 'quote' ? '> ' : type === 'ul' ? '- ' : (i + start) + '. '}${line}`).join('\n');
@@ -72,7 +84,26 @@
     }).join('\n\n');
   }
 
-  const inline = text => formatInline(escape(text));
+  function inline(text) {
+    const tokens = [];
+    const stash = html => `\uE000${tokens.push(html) - 1}\uE001`;
+    const restore = value => value.replace(/\uE000(\d+)\uE001/g,(token,index) => tokens[index] ?? token);
+    let escaped = escape(text).replace(/\x60([^\x60\n]+)\x60/g,(_,code) => stash(`<code>${code}</code>`));
+    const span = /&lt;span(?: data-ink=&quot;([a-z]+)&quot;)?(?: data-highlight=&quot;([a-z]+)&quot;)?&gt;((?:(?!&lt;\/?span\b)[^\n])*)&lt;\/span&gt;/g;
+    let previous;
+    do {
+      previous = escaped;
+      escaped = escaped.replace(span,(match,ink,highlight,body) => {
+        if ((!ink && !highlight) || (ink && !Object.hasOwn(inkColors,ink)) ||
+            (highlight && !Object.hasOwn(highlightColors,highlight))) return match;
+        const color = ink ? ` data-ink="${ink}"` : '';
+        const marker = highlight ? ` data-highlight="${highlight}"` : '';
+        const style = [ink && `color:${schemeColor(inkColors[ink])}`,highlight && `background-color:${schemeColor(highlightColors[highlight])}`].filter(Boolean).join(';');
+        return stash(`<span${color}${marker} style="${style}">${restore(formatInline(body))}</span>`);
+      });
+    } while (escaped !== previous);
+    return restore(formatInline(escaped));
+  }
 
   function formatInline(text) {
     return text.replace(/\x60([^\x60\n]+)\x60|\*\*\*([^*\n]+)\*\*\*|\*\*([^*\n]+)\*\*|(?<!\*)\*([^*\s](?:[^*\n]*[^*\s])?)\*(?!\*)|~~([^~\n]+)~~/g,
@@ -91,12 +122,22 @@
     };
     const formatted = node => {
       if (node.nodeType !== 1 || node.matches('br,script,style,button,[hidden]')) return plain(node);
-      const text = [...node.childNodes].map(formatted).join('');
+      let text = [...node.childNodes].map(formatted).join('');
       if (!text.trim()) return text;
-      if (node.matches('code,[data-inline-code]')) return `\x60${plain(node)}\x60`;
-      if (node.matches('b,strong') || /^(bold|[6-9]00)$/.test(node.style.fontWeight)) return `**${text}**`;
-      if (node.matches('i,em') || node.style.fontStyle === 'italic') return `*${text}*`;
-      if (node.matches('s,strike,del') || node.style.textDecorationLine.includes('line-through')) return `~~${text}~~`;
+      if (node.matches('code,[data-inline-code]')) text = `\x60${plain(node)}\x60`;
+      else {
+        const bold = node.matches('b,strong') || /^(bold|[6-9]00)$/.test(node.style.fontWeight);
+        const italic = node.matches('i,em') || node.style.fontStyle === 'italic';
+        const emphasis = bold && italic ? '***' : bold ? '**' : italic ? '*' : '';
+        if (emphasis) text = `${emphasis}${text}${emphasis}`;
+        if (node.matches('s,strike,del') || node.style.textDecorationLine.includes('line-through')) text = `~~${text}~~`;
+      }
+      const ink = colorName(node.style.color || node.getAttribute('color') || '',inkColors);
+      const highlight = colorName(node.style.backgroundColor,highlightColors);
+      if (ink || highlight) {
+        const attrs = (ink ? ` data-ink="${ink}"` : '') + (highlight ? ` data-highlight="${highlight}"` : '');
+        text = text.split('\n').map(line => line.trim() ? `<span${attrs}>${line}</span>` : line).join('\n');
+      }
       return text;
     };
     function append(type, text, language, adjacent = false, start = 1) {
@@ -143,6 +184,9 @@
           append(tag,[...node.children].filter(child => child.localName === 'li').map(formatted).join('\n'),undefined,false,node.start);
         } else if (kind === 'ordered' || kind === 'bullet' || kind === 'unordered' || tag === 'li') {
           append(kind === 'ordered' ? 'ol' : 'ul',formatted(node.querySelector('.text-editor') || node),undefined,true);
+        } else if (kind === 'callout') {
+          const text = [...node.childNodes].map(child => (child.matches?.('div,p') && child.previousSibling ? '\n' : '') + formatted(child)).join('');
+          result.push({type:'callout',text:text.trim()});
         } else if (tag === 'blockquote' || kind === 'quote') {
           append('quote',formatted(node.querySelector('.text-editor') || node));
         } else if (kind === 'text' || tag === 'p') {
@@ -189,6 +233,7 @@
         return copyCode ? `<div class="code-panel"><div class="code-bar"><span class="subtle mono">${escape(language || '代码')}</span><button type="button" data-copy>复制</button></div>${code}</div>` : code;
       }
       if (type === 'ul' || type === 'ol') return `<${type}${type === 'ol' && start !== 1 ? ` start="${start}"` : ''}>${text.split('\n').map(line => `<li>${inline(line)}</li>`).join('')}</${type}>`;
+      if (type === 'callout') return `<div class="markdown-callout" data-block-type="callout">${inline(text).replaceAll('\n','<br>') || '<br>'}</div>`;
       const tag = type === 'quote' ? 'blockquote' : 'p';
       return `<${tag}>${inline(text).replaceAll('\n','<br>')}</${tag}>`;
     }).join('');
@@ -203,5 +248,5 @@
     if (event.target.matches?.('img.cover-image')) event.target.hidden = true;
   }, true);
 
-  window.blogMarkdown = {escape, blocks, source, render, fromDocument, clipboardBlocks, coverImage};
+  window.blogMarkdown = {escape, blocks, source, render, fromDocument, clipboardBlocks, coverImage, inkColors, highlightColors, schemeColor};
 })();
