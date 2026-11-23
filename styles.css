@@ -230,6 +230,7 @@ pre{overflow:auto;margin:0;padding:11px 14px;font:.875rem/1.7 var(--mono)}
 .admin-list li+li{border-top:1px solid var(--line)}
 .admin-item-title{font-weight:650;max-width:100%;overflow-wrap:anywhere;color:var(--ink);min-height:36px}
 .admin-list small{display:block;padding-left:9px;color:var(--muted)}
+.admin-list .admin-article-stats{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;font-size:.8125rem;font-variant-numeric:tabular-nums}
 .admin-state{justify-self:start;border:1px solid var(--line);border-radius:6px;padding:2px 6px;color:var(--muted);font-size:.8125rem;white-space:nowrap}
 .admin-state.published{color:var(--accent);background:var(--selected);border-color:transparent}
 .admin-states{display:flex;flex-wrap:wrap;gap:4px}
@@ -273,9 +274,11 @@ pre{overflow:auto;margin:0;padding:11px 14px;font:.875rem/1.7 var(--mono)}
 .admin-feedback{font-size:.875rem;font-weight:650;color:var(--accent);margin:10px 0}
 .admin-feedback[data-error=true],.form-error{color:#bd2f37}
 :root[data-theme=dark] .admin-feedback[data-error=true],:root[data-theme=dark] .form-error{color:#ff9ca1}
-#admin-delete{width:min(420px,calc(100% - 28px));background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:17px}
-#admin-delete::backdrop{background:#141b2b7d}
-#admin-delete h2{font-size:1.15rem;margin-bottom:6px}
+#admin-confirm{width:min(420px,calc(100% - 32px));background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:24px}
+#admin-confirm::backdrop{background:#141b2b7d}
+#admin-confirm h2{font-size:1.15rem;margin-bottom:8px}
+#admin-confirm p{color:var(--muted)}
+#admin-confirm .actions{justify-content:flex-end;margin-top:24px}
 .danger-button{border:1px solid #a32332;border-radius:8px;background:#a32332;color:#fff;padding:8px 13px;min-height:42px}
 .editor-toolbar{display:flex;justify-content:space-between;align-items:center;gap:7px;flex-wrap:wrap;border-block:1px solid var(--line);padding:7px 0;margin-top:7px}
 .editor-modes{display:flex;gap:4px}
@@ -309,11 +312,15 @@ pre{overflow:auto;margin:0;padding:11px 14px;font:.875rem/1.7 var(--mono)}
 .block-menu summary::-webkit-details-marker{display:none}
 .block-menu[open] summary{background:var(--selected);border-color:var(--strong-line)}
 .block-type{color:var(--accent);font-weight:700}
-.block-options{position:absolute;top:100%;left:0;z-index:3;width:220px;max-width:calc(100vw - 62px);max-height:min(320px,40dvh);overflow:auto;background:var(--surface);border:1px solid var(--strong-line);border-radius:8px;padding:6px;box-shadow:0 4px 12px #0002;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px}
+.block-options,.selection-toolbar{position:fixed;background:var(--surface);border:1px solid var(--strong-line);border-radius:8px;box-shadow:0 4px 12px #0002}
+.block-options{width:min(232px,calc(100vw - 24px));overflow:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px;padding:8px;overscroll-behavior:contain}
 .block-menu-target{background:var(--selected);border-radius:4px}
-@media(min-width:701px) and (hover:hover){.block-options{left:auto;right:calc(100% - 1px);top:0}}
-.block-options p{grid-column:1/-1;padding:3px 5px;color:var(--muted);font-size:.8125rem}
-.block-options button{background:transparent;border:0;border-radius:6px;text-align:left;padding:6px;font-size:.875rem;min-height:35px}
+.selection-toolbar:not([hidden]){display:flex;gap:2px;z-index:3;padding:4px}
+.selection-toolbar button{border:0;border-radius:4px;background:transparent;min-width:40px;min-height:36px;padding:4px;font-size:.9375rem}
+.selection-toolbar button:hover:not(:disabled),.selection-toolbar button[aria-pressed=true]{color:var(--accent);background:var(--selected)}
+.block-options p{grid-column:1/-1;padding:4px 8px;color:var(--muted);font-size:.8125rem}
+.block-options p:not(:first-child){border-top:1px solid var(--line);margin-top:4px;padding-top:8px}
+.block-options button{background:transparent;border:0;border-radius:4px;text-align:left;padding:4px 8px;font-size:.875rem;min-height:32px}
 .block-options button:hover:not(:disabled){background:var(--selected);color:var(--accent)}
 .editor-source{padding-top:9px}
 .editor-source textarea{min-height:245px}
@@ -386,4 +393,5 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:.875rem}
   .admin-metric{padding:9px}
 }
 @media(pointer:coarse){.block-menu summary{min-height:42px}}
+@media(pointer:coarse){.selection-toolbar button,.block-options button{min-height:44px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}

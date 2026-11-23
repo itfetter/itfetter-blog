@@ -14,12 +14,12 @@
     <p id="admin-status" class="admin-feedback" role="status"></p>
   </section>
 </div>
-<dialog id="admin-delete" aria-labelledby="delete-heading">
-  <h2 id="delete-heading">删除这条内容？</h2>
-  <p></p>
+<dialog id="admin-confirm" aria-labelledby="confirm-heading" aria-describedby="confirm-detail">
+  <h2 id="confirm-heading"></h2>
+  <p id="confirm-detail"></p>
   <form method="dialog" class="actions">
     <button value="cancel" class="secondary" autofocus>取消</button>
-    <button value="delete" class="danger-button">确认删除</button>
+    <button value="confirm" class="primary"></button>
   </form>
 </dialog>
 <script src="/markdown.js"></script>

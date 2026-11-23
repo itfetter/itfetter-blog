@@ -1,7 +1,7 @@
 (() => {
   const page = document.querySelector('#admin-page');
   const feedback = document.querySelector('#admin-status');
-  const deletion = document.querySelector('#admin-delete');
+  const confirmation = document.querySelector('#admin-confirm');
   const {escape, blocks:parseMarkdown, source:markdownSource, render:renderMarkdown, fromDocument:readDocument, clipboardBlocks} = window.blogMarkdown;
   const labels = {posts:'文章',notes:'笔记',projects:'项目'};
   const types = {p:'正文',h1:'一级标题',h2:'二级标题',h3:'三级标题',h4:'四级标题',h5:'五级标题',h6:'六级标题',ul:'无序列表',ol:'有序列表',quote:'引用',code:'代码块'};
@@ -13,9 +13,19 @@
   let view = Object.hasOwn(labels,requestedView) || requestedView === 'settings' ? requestedView : 'overview';
   let dirty = false;
   let busy = false;
+  let editorEvents;
 
-  function leaveEditor() {
-    return !busy && (!dirty || window.confirm('改动尚未保存。确定离开编辑页？'));
+  function confirmAction(title, detail, action, destructive = false) {
+    confirmation.querySelector('h2').textContent = title;
+    confirmation.querySelector('p').textContent = detail;
+    const button = confirmation.querySelector('[value=confirm]');
+    button.textContent = action;
+    button.className = destructive ? 'danger-button' : 'primary';
+    confirmation.returnValue = '';
+    confirmation.showModal();
+    return new Promise(resolve => {
+      confirmation.addEventListener('close', () => resolve(confirmation.returnValue === 'confirm'), {once:true});
+    });
   }
 
   async function api(change) {
@@ -36,14 +46,15 @@
     feedback.dataset.error = String(error);
   }
 
-  function switchView(next) {
-    if (!leaveEditor()) return;
+  async function switchView(next) {
+    if (busy || (dirty && !await confirmAction('离开编辑页？','尚未保存的改动会丢失。','离开'))) return false;
     view = next;
     const fragment = next === 'overview' ? '' : `#${next}`;
     history.replaceState(history.state,'',`${location.pathname}${location.search}${fragment}`);
     dirty = false;
     notify('');
     render();
+    return true;
   }
 
   function download(name, text, mimeType) {
@@ -56,6 +67,7 @@
   }
 
   function render() {
+    editorEvents?.abort();
     document.querySelectorAll('[data-view]').forEach(button => {
       if (button.dataset.view === view) button.setAttribute('aria-current','page');
       else button.removeAttribute('aria-current');
@@ -66,9 +78,8 @@
       page.innerHTML = `<div class="admin-page-head"><div><h2>总览</h2><p>查看博客的发布状态，继续整理内容。</p></div><button type="button" class="primary" id="quick-post">新建文章</button></div>
         <div class="admin-metrics">${Object.entries(labels).map(([key,label]) => `<button type="button" class="admin-metric" data-open="${key}"><strong>${data[key].filter(item => item.status === 'published').length}</strong><span>已发布${label}</span><small>${data[key].filter(item => item.status === 'draft' || item.draft).length} 条草稿</small></button>`).join('')}</div>
         <section class="admin-card"><h3>站点</h3><p>${escape(data.settings.author)} · ${escape(data.settings.title)}</p><button type="button" class="secondary" data-open="settings">编辑站点设置</button></section>`;
-      page.querySelector('#quick-post').addEventListener('click', () => {
-        switchView('posts');
-        openEditor();
+      page.querySelector('#quick-post').addEventListener('click', async () => {
+        if (await switchView('posts')) openEditor();
       });
       page.querySelectorAll('[data-open]').forEach(button => button.addEventListener('click', () => switchView(button.dataset.open)));
     } else {
@@ -84,16 +95,20 @@
     const query = page.querySelector('#item-query');
     const state = page.querySelector('#item-status');
     const rows = page.querySelector('#item-rows');
+    function articleMetrics(id) {
+      const engagement = data.engagement?.[id];
+      return `<small class="admin-article-stats"><span>浏览 ${engagement?.views ?? 0}</span><span>评论 ${data.comments?.[id]?.length ?? 0}</span><span>点赞 ${engagement?.likes.length ?? 0}</span></small>`;
+    }
     function refresh() {
       const keyword = query.value.trim().toLowerCase();
       const visible = data[view].filter(item => (!state.value || item.status === state.value || (state.value === 'revision' && item.draft)) && [item.title,item.draft?.title].some(title => title?.toLowerCase().includes(keyword)));
       page.querySelector('#item-count').textContent = `共 ${visible.length} 条`;
-      rows.innerHTML = visible.length ? `<ul>${[...visible].sort((a,b) => (b.date || '').localeCompare(a.date || '')).map(item => `<li><div><strong class="admin-item-title">${escape(item.title)}</strong><small>${escape(item.date || item.kind || '')}${item.topic ? ` · ${escape(data.topics[item.topic])}` : ''}</small></div><div class="admin-states"><span class="admin-state ${item.status}">${item.status === 'published' ? '已发布' : '草稿'}</span>${item.draft ? '<span class="admin-state">有草稿</span>' : ''}</div><div class="admin-row-actions"><button type="button" data-edit="${item.id}" aria-label="编辑 ${escape(item.title)}">编辑</button>${view === 'posts' && item.status === 'published' ? `<a href="/#post/${item.id}" target="_blank" rel="noopener">查看</a>` : ''}<button type="button" data-delete="${item.id}" aria-label="删除 ${escape(item.title)}">删除</button></div></li>`).join('')}</ul>` : `<div class="admin-empty"><p>${query.value || state.value ? '没有符合条件的内容。' : `还没有${label}。`}</p>${query.value || state.value ? '<button type="button" class="secondary" id="reset-items">清除筛选</button>' : ''}</div>`;
+      rows.innerHTML = visible.length ? `<ul>${[...visible].sort((a,b) => (b.date || '').localeCompare(a.date || '')).map(item => `<li><div><strong class="admin-item-title">${escape(item.title)}</strong><small>${escape(item.date || item.kind || '')}${item.topic ? ` · ${escape(data.topics[item.topic])}` : ''}</small>${view === 'posts' ? articleMetrics(item.id) : ''}</div><div class="admin-states"><span class="admin-state ${item.status}">${item.status === 'published' ? '已发布' : '草稿'}</span>${item.draft ? '<span class="admin-state">有草稿</span>' : ''}</div><div class="admin-row-actions"><button type="button" data-edit="${item.id}" aria-label="编辑 ${escape(item.title)}">编辑</button>${view === 'posts' && item.status === 'published' ? `<a href="/#post/${item.id}" target="_blank" rel="noopener">查看</a>` : ''}<button type="button" data-delete="${item.id}" aria-label="删除 ${escape(item.title)}">删除</button></div></li>`).join('')}</ul>` : `<div class="admin-empty"><p>${query.value || state.value ? '没有符合条件的内容。' : `还没有${label}。`}</p>${query.value || state.value ? '<button type="button" class="secondary" id="reset-items">清除筛选</button>' : ''}</div>`;
     }
     query.addEventListener('input',refresh);
     state.addEventListener('change',refresh);
     page.querySelector('#new-item').addEventListener('click', () => openEditor());
-    rows.addEventListener('click', event => {
+    rows.addEventListener('click', async event => {
       const button = event.target.closest('button');
       if (!button) return;
       if (button.id === 'reset-items') {
@@ -104,12 +119,9 @@
       } else if (button.dataset.edit) openEditor(data[view].find(item => item.id === button.dataset.edit));
       else if (button.dataset.delete) {
         const item = data[view].find(item => item.id === button.dataset.delete);
-        deletion.querySelector('p').textContent = `「${item.title}」将从后台和前台移除。`;
-        deletion.returnValue = 'cancel';
-        deletion.showModal();
-        deletion.addEventListener('close', () => {
-          if (deletion.returnValue === 'delete') save({collection:view,id:item.id,item:null}, '已删除。');
-        }, {once:true});
+        if (await confirmAction('删除这条内容？',`「${item.title}」将从后台和前台移除。`,'确认删除',true)) {
+          save({collection:view,id:item.id,item:null}, '已删除。');
+        }
       }
     });
     refresh();
@@ -202,7 +214,7 @@
 
     function saveDraftWhenReady() {
       if (!form.isConnected || !dirty) return;
-      if (busy) {
+      if (busy || confirmation.open) {
         saveTimer = setTimeout(saveDraftWhenReady,1200);
       } else if (!form.elements.title.value.trim()) {
         draftStatus.textContent = '填写标题后自动保存。';
@@ -215,8 +227,11 @@
       if (settings) settings.open = true;
     },true);
     page.querySelector('#return-list').addEventListener('click', () => switchView(collection));
-    page.querySelector('#withdraw-post')?.addEventListener('click', () => {
-      if (leaveEditor() && window.confirm('撤回后读者将暂时无法访问这篇文章。确定撤回？')) {
+    page.querySelector('#withdraw-post')?.addEventListener('click', async () => {
+      if (busy) return;
+      const detail = '撤回后，文章将保留为草稿，读者将暂时无法访问。';
+      if (await confirmAction('撤回发布？',detail + (dirty ? ' 尚未保存的改动会丢失。' : ''),'确认撤回')) {
+        clearTimeout(saveTimer);
         save({collection,id:entry.id,action:'withdraw'},'已撤回发布，文章保留为草稿。');
       }
     });
@@ -250,6 +265,8 @@
   }
 
   function articleEditor(root, item, onEdit) {
+    const {signal} = (editorEvents = new AbortController());
+    const adminHeader = document.querySelector('.header');
     let markdown = item.body || '';
     let mode = 'document';
     let activeRange = null;
@@ -270,8 +287,66 @@
     const typeButtons = Object.entries(types).filter(([type]) => !/^h[4-6]$/.test(type)).map(([type,label]) => `<button type="button" data-type="${type}">${label}</button>`).join('');
     let documentEditor = null;
     let menu = null;
+    let menuOptions = null;
+    let selectionToolbar = null;
     let menuBlock = null;
     let hoverOpened = false;
+
+    function positionBlockOptions() {
+      const handle = menu.querySelector('summary').getBoundingClientRect();
+      const topEdge = adminHeader.getBoundingClientRect().bottom + 8;
+      const bottomEdge = window.innerHeight - 8;
+      const rightEdge = document.documentElement.clientWidth - 8;
+      if (handle.bottom <= topEdge || handle.top >= bottomEdge) {
+        menu.open = false;
+        hoverOpened = false;
+        return;
+      }
+      menuOptions.style.maxHeight = `${bottomEdge - topEdge}px`;
+      const {width,height} = menuOptions.getBoundingClientRect();
+      const spaceLeft = handle.left - 8;
+      const spaceRight = rightEdge - handle.right;
+      const beside = Math.max(spaceLeft,spaceRight) >= width;
+      const left = spaceLeft >= width ? handle.left - width + 1 : beside ? handle.right - 1 : handle.left;
+      const start = beside ? handle.top : handle.bottom - 1;
+      const end = beside ? handle.bottom - height : handle.top - height + 1;
+      const top = start + height <= bottomEdge ? start : end;
+      menuOptions.style.left = `${Math.max(8,Math.min(left,rightEdge - width))}px`;
+      menuOptions.style.top = `${Math.max(topEdge,Math.min(top,bottomEdge - height))}px`;
+    }
+
+    function inlineCodeAt(range) {
+      const code = range.startContainer.parentElement?.closest('code');
+      return code?.contains(range.endContainer) ? code : null;
+    }
+
+    function positionSelectionToolbar() {
+      if (!activeRange || activeRange.collapsed || !activeRange.toString().trim() || menu.open) {
+        selectionToolbar.hidden = true;
+        return;
+      }
+      const block = blockAt(activeRange.startContainer);
+      const endBlock = blockAt(activeRange.endContainer);
+      const rangeBounds = activeRange.getBoundingClientRect();
+      const topEdge = adminHeader.getBoundingClientRect().bottom + 8;
+      if (block?.closest('pre') || endBlock?.closest('pre') || !rangeBounds.width ||
+          rangeBounds.bottom < topEdge || rangeBounds.top >= window.innerHeight) {
+        selectionToolbar.hidden = true;
+        return;
+      }
+      selectionToolbar.hidden = false;
+      const {width,height} = selectionToolbar.getBoundingClientRect();
+      const right = document.documentElement.clientWidth - width - 8;
+      const above = rangeBounds.top - height - 8;
+      const below = rangeBounds.bottom + 8;
+      selectionToolbar.style.left = `${Math.max(8,Math.min(rangeBounds.left,right))}px`;
+      selectionToolbar.style.top = `${Math.max(topEdge,Math.min(above >= topEdge ? above : below,window.innerHeight - height - 8))}px`;
+      for (const button of selectionToolbar.querySelectorAll('button')) {
+        const command = button.dataset.format;
+        button.setAttribute('aria-pressed',String(command === 'code' ? Boolean(inlineCodeAt(activeRange)) : document.queryCommandState(command)));
+      }
+      selectionToolbar.querySelector('[data-format=code]').disabled = !block || block !== endBlock;
+    }
 
     function blockAt(node) {
       if (node?.nodeType === 3) node = node.parentElement;
@@ -304,6 +379,24 @@
         positionMenu(block);
       }
     }
+
+    document.addEventListener('selectionchange', () => {
+      if (!documentEditor || selectionToolbar.contains(document.activeElement)) return;
+      const selection = window.getSelection();
+      if (documentEditor.contains(selection.anchorNode) && documentEditor.contains(selection.focusNode)) {
+        trackSelection();
+        positionSelectionToolbar();
+      } else {
+        selectionToolbar.hidden = true;
+      }
+    }, {signal});
+    function positionOverlays() {
+      if (!documentEditor) return;
+      if (menu.open) positionBlockOptions();
+      if (!selectionToolbar.hidden) positionSelectionToolbar();
+    }
+    window.addEventListener('scroll',positionOverlays,{signal,passive:true});
+    window.addEventListener('resize',positionOverlays,{signal});
 
     function sync() {
       markdown = markdownSource(readDocument(documentEditor));
@@ -415,8 +508,21 @@
         canvas.innerHTML = `<div class="document-workspace"><details class="block-menu" hidden><summary aria-label="当前块操作"><span class="block-type" aria-hidden="true">¶</span><span aria-hidden="true">⋮⋮</span></summary><div class="block-options"><p>块类型</p>${typeButtons}<p>格式</p><button type="button" data-command="bold">加粗</button><p>块操作</p><button type="button" data-action="add">在下方添加</button><button type="button" data-action="up" disabled>上移</button><button type="button" data-action="down" disabled>下移</button><button type="button" data-action="remove" disabled>删除此块</button></div></details><div class="document-editor" contenteditable="true" role="textbox" aria-label="文章正文" aria-multiline="true" spellcheck="false">${renderMarkdown(parseMarkdown(markdown)) || '<p><br></p>'}</div></div><p class="subtle editor-hint">指向正文块可打开左侧菜单，空白块也可以按 /。</p>`;
         documentEditor = canvas.querySelector('.document-editor');
         menu = canvas.querySelector('.block-menu');
+        menuOptions = menu.querySelector('.block-options');
+        selectionToolbar = document.createElement('div');
+        selectionToolbar.className = 'selection-toolbar';
+        selectionToolbar.hidden = true;
+        selectionToolbar.setAttribute('role','group');
+        selectionToolbar.setAttribute('aria-label','选中文字格式');
+        selectionToolbar.innerHTML = '<button type="button" data-format="bold" aria-label="加粗" title="加粗"><b>B</b></button><button type="button" data-format="italic" aria-label="斜体" title="斜体"><i>I</i></button><button type="button" data-format="strikeThrough" aria-label="删除线" title="删除线"><s>S</s></button><button type="button" data-format="code" aria-label="行内代码" title="行内代码">&lt;/&gt;</button>';
+        documentEditor.after(selectionToolbar);
         menu.addEventListener('toggle', event => {
-          if (event.currentTarget === menu) menuBlock?.classList.toggle('block-menu-target',menu.open);
+          if (event.currentTarget !== menu) return;
+          menuBlock?.classList.toggle('block-menu-target',menu.open);
+          if (menu.open) {
+            selectionToolbar.hidden = true;
+            positionBlockOptions();
+          }
         });
         if (savedDocument?.markdown === markdown) documentEditor.innerHTML = savedDocument.html;
         else if (savedDocument) record(savedDocument);
@@ -424,8 +530,7 @@
       }
     }
 
-    function changeBlock(button) {
-      const block = menuBlock;
+    function changeBlock(button, block) {
       hoverOpened = false;
       menu.open = false;
       if (!block) return;
@@ -452,7 +557,6 @@
         return;
       }
       if (action === 'remove') {
-        if (block.textContent.trim() && !window.confirm('删除这个正文块？')) return;
         const neighbor = block.nextElementSibling || block.previousElementSibling;
         const parent = block.parentElement;
         block.remove();
@@ -498,10 +602,14 @@
       trackSelection();
     }
 
-    root.addEventListener('click', event => {
-      if (hoverOpened && menu?.contains(event.target) && event.target.closest('summary')) {
+    root.addEventListener('click', async event => {
+      if (menu?.contains(event.target) && event.target.closest('summary')) {
         event.preventDefault();
-        hoverOpened = false;
+        if (hoverOpened) hoverOpened = false;
+        else {
+          menu.open = !menu.open;
+          if (menu.open) positionBlockOptions();
+        }
         return;
       }
       const button = event.target.closest('button');
@@ -519,7 +627,7 @@
         mode = button.dataset.mode;
         paint();
       } else if ('restore' in button.dataset) {
-        if (markdown.trim() && !window.confirm('用原浏览器草稿替换当前正文？')) return;
+        if (markdown.trim() && !await confirmAction('替换当前正文？','将用原浏览器草稿替换当前正文。','替换正文')) return;
         if (documentEditor) savedDocument = snapshot();
         markdown = legacy;
         onEdit();
@@ -527,7 +635,35 @@
       } else if ('export' in button.dataset) {
         download(`${item.id || 'itfetter-draft'}.md`,markdown,'text/markdown;charset=utf-8');
       } else if (menu?.contains(button)) {
-        applyEdit(() => changeBlock(button));
+        const block = menuBlock;
+        if (button.dataset.action === 'remove' && block?.textContent.trim() &&
+            !await confirmAction('删除正文块？','可以在编辑器中撤销这次删除。','删除正文块',true)) return;
+        applyEdit(() => changeBlock(button,block));
+      } else if (button.dataset.format && activeRange) {
+        const range = activeRange.cloneRange();
+        documentEditor.focus();
+        selectRange(range);
+        applyEdit(() => {
+          if (button.dataset.format !== 'code') {
+            document.execCommand(button.dataset.format);
+            return;
+          }
+          const existing = inlineCodeAt(range);
+          if (existing) {
+            const text = document.createTextNode(existing.textContent);
+            existing.replaceWith(text);
+            range.selectNodeContents(text);
+            selectRange(range);
+            return;
+          }
+          const code = document.createElement('code');
+          code.textContent = range.toString();
+          range.deleteContents();
+          range.insertNode(code);
+          range.selectNodeContents(code);
+          selectRange(range);
+        });
+        positionSelectionToolbar();
       }
     });
 
@@ -603,6 +739,7 @@
       if (event.pointerType === 'touch' || !menuBlock || menu.open || !menu.contains(event.target) || !event.target.closest('summary')) return;
       trackSelection(false);
       menu.open = true;
+      positionBlockOptions();
       hoverOpened = true;
     });
     canvas.addEventListener('pointerout', event => {
@@ -616,7 +753,7 @@
       }
     });
     canvas.addEventListener('mousedown', event => {
-      if (menu?.contains(event.target) && event.button === 0) {
+      if ((menu?.contains(event.target) || selectionToolbar?.contains(event.target)) && event.button === 0) {
         trackSelection(false);
         // Keep the browser's text selection while the pointer operates the block menu.
         event.preventDefault();
@@ -641,6 +778,7 @@
         if (activeRange?.collapsed && !(block || documentEditor).textContent.trim()) {
           event.preventDefault();
           menu.open = true;
+          positionBlockOptions();
           menu.querySelector('button').focus();
         }
       } else if (event.key === 'Escape' && menu.open && activeRange) {
@@ -648,6 +786,10 @@
         menu.open = false;
         documentEditor.focus();
         selectRange(activeRange);
+      } else if (event.key === 'Escape' && !selectionToolbar.hidden) {
+        event.preventDefault();
+        selectionToolbar.hidden = true;
+        documentEditor.focus();
       }
     });
     paint();

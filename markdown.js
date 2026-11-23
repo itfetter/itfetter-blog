@@ -45,7 +45,13 @@
     }).join('\n\n');
   }
 
-  const inline = text => escape(text).replace(/\x60([^\x60\n]+)\x60|\*\*([^*\n]+)\*\*/g, (_, code, bold) => code ? `<code>${code}</code>` : `<strong>${bold}</strong>`);
+  const inline = text => formatInline(escape(text));
+
+  function formatInline(text) {
+    return text.replace(/\x60([^\x60\n]+)\x60|\*\*\*([^*\n]+)\*\*\*|\*\*([^*\n]+)\*\*|(?<!\*)\*([^*\s](?:[^*\n]*[^*\s])?)\*(?!\*)|~~([^~\n]+)~~/g,
+      (_, code, both, bold, italic, crossed) => code ? `<code>${code}</code>` : both ? `<strong><em>${formatInline(both)}</em></strong>` :
+        bold ? `<strong>${formatInline(bold)}</strong>` : italic ? `<em>${formatInline(italic)}</em>` : `<del>${formatInline(crossed)}</del>`);
+  }
 
   function fromDocument(root) {
     const result = [];
@@ -62,6 +68,8 @@
       if (!text.trim()) return text;
       if (node.matches('code,[data-inline-code]')) return `\x60${plain(node)}\x60`;
       if (node.matches('b,strong') || /^(bold|[6-9]00)$/.test(node.style.fontWeight)) return `**${text}**`;
+      if (node.matches('i,em') || node.style.fontStyle === 'italic') return `*${text}*`;
+      if (node.matches('s,strike,del') || node.style.textDecorationLine.includes('line-through')) return `~~${text}~~`;
       return text;
     };
     function append(type, text, language, adjacent = false, start = 1) {
