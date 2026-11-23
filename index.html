@@ -137,17 +137,20 @@
 
     function article(post) {
       const related = posts.find(item => item.topic === post.topic && item !== post);
-      const blocks = markdownBlocks(post.body);
-      const links = blocks.filter(block => /^h[1-6]$/.test(block.type)).map((block, i) => `<li><a href="${postLink(post)}/${i + 1}">${escapeHtml(block.text)}</a></li>`).join('');
+      const body = renderMarkdown(markdownBlocks(post.body),true);
+      const parsed = document.createElement('template');
+      parsed.innerHTML = body;
+      const links = [...parsed.content.querySelectorAll('[id^=section-]')].map((heading,i) =>
+        `<li><a href="${postLink(post)}/${i + 1}"><span class="toc-index" aria-hidden="true">${i + 1}.</span><span>${escapeHtml(heading.textContent)}</span></a></li>`).join('');
       const discussion = `<a class="toc-comments" href="${postLink(post)}/comments"><span>讨论与评论</span><span class="comment-count" data-comment-count>${commentLabel(post)}</span></a>`;
-      const toc = cssClass => `<nav class="toc ${cssClass}" aria-label="本文目录"><strong>本文目录</strong>${links ? `<ol>${links}</ol>` : ''}${discussion}</nav>`;
+      const toc = `${links ? `<ol>${links}</ol>` : ''}${discussion}`;
       return `<div class="article-grid"><article class="reading">${metadata(post)}<h1>${escapeHtml(post.title)}</h1><p class="lede">${escapeHtml(post.summary)}</p>${post.sample ? '<p class="meta">原型样稿</p>' : ''}
         <div class="article-engagement"><span data-view-count>${post.viewCount ?? 0} 次浏览</span><button type="button" class="secondary" aria-label="点赞文章" aria-pressed="false" disabled><span aria-hidden="true">♡</span><span data-like-label>点赞 ${post.likeCount ?? 0}</span></button><span role="status"></span></div>
-        ${cover(post)}${toc('toc-inline')}<div id="article-body">${renderMarkdown(blocks,true)}</div>
+        <details class="toc toc-inline"><summary>本文目录</summary><div>${toc}</div></details>${cover(post)}<div id="article-body">${body}</div>
         ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}
         <section class="article-comments" aria-labelledby="section-comments"><div class="discussion-heading"><h2 id="section-comments" tabindex="-1">讨论与评论</h2><span class="comment-count" data-comment-count>${commentLabel(post)}</span></div>
         <form class="comment-form" hidden><label>昵称<input name="author" maxlength="40" autocomplete="nickname" required></label><div class="comment-reply" hidden><span></span><button type="button" class="secondary">取消回复</button></div><label>评论<textarea name="body" rows="4" maxlength="2000" required placeholder="分享你的实践经验，或提一个问题"></textarea></label><div class="comment-form-actions"><small>支持行内代码 · Ctrl / ⌘ + Enter 发布</small><button type="submit" class="primary">发表评论</button></div></form>
-        <p class="comment-feedback" role="status">正在加载评论…</p><button type="button" class="secondary comment-retry" hidden>重新加载</button><div class="comment-list"></div></section></article>${toc('')}</div>`;
+        <p class="comment-feedback" role="status">正在加载评论…</p><button type="button" class="secondary comment-retry" hidden>重新加载</button><div class="comment-list"></div></section></article><nav class="toc" aria-label="本文目录"><strong>本文目录</strong>${toc}</nav></div>`;
     }
 
     function mountEngagement(post) {
@@ -282,8 +285,19 @@
 
     function updateProgress() {
       const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-      const active = main.querySelector('.article-grid') && scrollable > 0;
-      progress.style.width = `${active ? Math.min(100, Math.max(0, window.scrollY / scrollable * 100)) : 0}%`;
+      const article = main.querySelector('.article-grid');
+      progress.style.width = `${article && scrollable > 0 ? Math.min(100, Math.max(0, window.scrollY / scrollable * 100)) : 0}%`;
+      if (!article) return;
+      const headings = [...article.querySelectorAll('[id^=section-]')];
+      const offset = parseFloat(getComputedStyle(headings[0]).scrollMarginTop) + 1;
+      const comments = headings.at(-1);
+      const atBottom = window.scrollY > 0 && window.scrollY >= scrollable - 2 && comments.getBoundingClientRect().top < window.innerHeight;
+      const current = atBottom ? comments : headings.findLast(heading => heading.getBoundingClientRect().top <= offset);
+      const currentHash = current ? `#post/${currentPost}/${current.id.slice('section-'.length)}` : '';
+      for (const link of article.querySelectorAll('.toc a')) {
+        if (link.hash === currentHash) link.setAttribute('aria-current','location');
+        else link.removeAttribute('aria-current');
+      }
     }
 
     function about() {
@@ -324,6 +338,7 @@
       currentPage = page;
       currentPost = post ? post.id : '';
       articleReturnBar.hidden = !post;
+      main.classList.toggle('article-page',Boolean(post));
       if (post) articleBack.href = history.state?.articleReturn?.hash || '#archive';
       const current = page === 'post' ? 'archive' : page;
       document.querySelectorAll('.nav a').forEach(link => {
@@ -358,10 +373,6 @@
         main.focus({preventScroll:true});
         window.scrollTo(0,0);
       }
-      main.querySelectorAll('.toc a').forEach(link => {
-        if (link.hash === location.hash) link.setAttribute('aria-current','location');
-        else link.removeAttribute('aria-current');
-      });
       updateProgress();
     }
 

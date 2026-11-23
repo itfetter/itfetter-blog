@@ -1,5 +1,6 @@
 :root {
   --article-back-height:44px;
+  --article-shell:1000px;
   color-scheme:light;
   --bg:#fff;--surface:#fff;--subtle:#f7f8fa;--hover:#f1f3f6;
   --ink:#16191f;--muted:#545c6b;--line:#e2e6ed;--strong-line:#cdd3de;
@@ -134,9 +135,10 @@ h2.year{padding-bottom:8px;border-bottom:1px solid var(--line)}
 .note-detail.reading{width:100%;margin:0 0 16px;padding:12px 0 0;border-top:1px solid var(--line)}
 .note-detail p:last-child{margin-bottom:0}
 .progress{position:fixed;top:0;left:0;height:2px;width:0;background:var(--accent);z-index:6;pointer-events:none}
-.article-grid{display:grid;grid-template-columns:minmax(0,720px) minmax(0,1fr);gap:48px}
+.article-page.wrap,#article-return.wrap{max-width:var(--article-shell)}
+.article-grid{--article-anchor-top:calc(84px + var(--article-back-height));display:grid;grid-template-columns:minmax(0,728px) minmax(0,232px);gap:40px;align-items:start}
 .reading{width:min(720px,100%);padding:36px 0 28px;margin-inline:auto}
-.article-grid .reading{width:100%;margin:0}
+.article-grid>.reading{width:100%;margin:0;padding-top:24px;min-width:0}
 .back{display:inline-flex;align-items:center;gap:7px;min-height:var(--article-back-height);padding-inline-end:12px}
 .back span{font-size:1.05em}
 .about-page{width:min(920px,100%);margin-inline:auto;padding:40px 0 28px}
@@ -164,12 +166,15 @@ h2.year{padding-bottom:8px;border-bottom:1px solid var(--line)}
 .reading .cover-image{aspect-ratio:2.1;width:100%;height:auto;margin:20px 0 24px}
 .reading p{line-height:1.8;margin-bottom:14px;overflow-wrap:anywhere}
 .reading h2{font-size:1.4rem;margin:25px 0 8px;letter-spacing:-.025em}
-.article-grid .reading :is(h2,h3,h4,h5,h6){scroll-margin-top:calc(88px + var(--article-back-height))}
-.toc{font-size:.875rem;color:var(--muted);border-left:1px solid var(--line);padding-left:12px}
-.article-grid .toc{align-self:start;position:sticky;top:calc(88px + var(--article-back-height));margin-top:24px}
-.toc strong{display:block;color:var(--ink);margin:0 8px 5px}
+.article-grid .reading :is(h2,h3,h4,h5,h6){scroll-margin-top:var(--article-anchor-top)}
+.toc{font-size:.875rem;line-height:1.5;color:var(--muted)}
+.article-grid>.toc{position:sticky;top:var(--article-anchor-top);margin-top:24px;padding-inline-start:16px;border-inline-start:1px solid var(--line);max-height:calc(100dvh - var(--article-anchor-top) - 16px);overflow:auto}
+.toc strong{display:block;color:var(--ink);margin:0 8px 8px;font-size:.8125rem}
 .toc ol{list-style:none;margin:0;padding:0}
-.toc a{display:block;padding:6px 8px;border-radius:6px}
+.toc a{display:block;padding:6px 8px;border-radius:6px;overflow-wrap:anywhere}
+.toc li a{display:grid;grid-template-columns:1.25em minmax(0,1fr);gap:4px}
+.toc-index{font-variant-numeric:tabular-nums}
+.toc a:focus-visible{outline-offset:-2px}
 .toc a:hover{background:var(--hover)}
 .toc a[aria-current=location]{background:var(--selected);color:var(--accent)}
 .toc .toc-comments{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 12px}
@@ -406,9 +411,14 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:.875rem}
   .home-grid .row{grid-template-columns:minmax(0,1fr) auto;gap:4px 8px}
   .home-grid .row time{grid-column:1/-1}
   .search-button kbd,.search-button span:not(.lens){display:none}
+}
+@media(max-width:880px){
+  .article-page.wrap,#article-return.wrap{max-width:728px}
   .article-grid{display:block}
   .article-grid>.toc{display:none}
-  .article-grid .toc-inline{display:block;position:static;margin:16px 0 22px}
+  .article-grid .toc-inline{display:block;margin:16px 0 20px;border:1px solid var(--line);border-radius:8px}
+  .toc-inline summary{cursor:pointer;padding:10px 12px;color:var(--ink);font-weight:600}
+  .toc-inline>div{padding:0 8px 8px}
 }
 @media(max-width:650px){
   .wrap{width:calc(100% - 32px)}
@@ -430,7 +440,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:.875rem}
   .about-page{padding-top:24px}
   .about-grid{grid-template-columns:minmax(0,1fr);gap:20px;margin-top:24px}
   .about-links{grid-column:1;border-inline-start:0;border-top:1px solid var(--line);padding:16px 0 0}
-  .article-grid .reading :is(h2,h3,h4,h5,h6){scroll-margin-top:calc(123px + var(--article-back-height))}
+  .article-grid{--article-anchor-top:calc(120px + var(--article-back-height))}
   .footer-inner{flex-wrap:wrap;padding-block:11px}
   .admin-layout{display:block}
   .admin-sidebar{padding:12px 0;border-right:0;border-bottom:1px solid var(--line)}
