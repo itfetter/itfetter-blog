@@ -20,7 +20,7 @@
 | 文档编辑 | `admin.js` 的 `articleEditor()`、`snapshot()` 和 `stepHistory()`，`markdown.js` 的 `fromDocument()` 与 `clipboardBlocks()` | 连续输入、粘贴、块菜单贴边定位、选区格式工具栏、选区保留、列表项转换、Markdown 往返及撤销重做 |
 | 高亮块与文字配色 | `markdown.js` 的高亮块和行内配色往返、`admin.js` 的选区工具栏、`styles.css` 的高亮块与色板 | 块转换、字体颜色、背景颜色、恢复默认、撤销，编辑、预览和发布一致 |
 | 文章表格和封面 | `admin.js` 的尺寸网格和行列操作，`markdown.js` 的表格读写与 `coverImage()`，`content_store.py` 的旧样稿兼容 | 网格选行列数、表格边缘圆点就地插入和删除、撤销、Tab 换格、前台对照、封面与替代文字、窄屏表格独立滚动 |
-| 文章发布与草稿 | `admin.js` 的 `contentList()`、`openEditor()` 和 `save()`，`content_store.py` 的 `update_content()`、`public_script()` | 停止输入后自动保存、保存后继续编辑、重复保存更新同一篇、草稿与已发布版本隔离、发布更新、显式撤回 |
+| 文章发布与草稿 | `admin.js` 的 `contentList()`、`openEditor()`、`saveBar()` 和 `save()`，`content_store.py` 的 `update_content()`、`public_script()` | 同一操作栏反馈自动保存、草稿和发布结果，发布与撤回确认，保存后保留正文及编辑模式，草稿与已发布版本隔离 |
 | 文章评论 | `index.html` 的 `row()`、`article()`、`mountComments()`，`server.py` 的 `/api/comments`，`content_store.py` 的评论读写和 `public_script()`，`styles.css` 的讨论区样式 | 评论及回复计数、目录跳转、留言和回复、刷新后保留、无评论和接口不可用提示、仅开放已发布文章 |
 | 浏览量与点赞 | `index.html` 的 `mountEngagement()`，`server.py` 的 `POST /api/post-stats?post=文章ID`，`content_store.py` 的 `update_engagement()` 和 `public_script()` | 当日按匿名浏览器标识去重、点赞和取消、各页面的计数同步、仅开放已发布文章 |
 | 站点设置 | `admin.js` 的 `settingsForm()`、`content_store.py` 的 `public_script()`、`index.html` 的 `settings` | 首页、页脚和关于页同步，置顶关联，静态导出排除草稿 |

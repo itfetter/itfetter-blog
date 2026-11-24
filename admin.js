@@ -23,6 +23,7 @@
   let dirty = false;
   let busy = false;
   let editorEvents;
+  const listFilters = {};
 
   function confirmAction(title, detail, action, destructive = false) {
     confirmation.querySelector('h2').textContent = title;
@@ -38,14 +39,19 @@
   }
 
   async function api(change, endpoint = '/admin/content') {
-    const response = await fetch(endpoint, change === undefined ? {} : {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(change),
-    });
+    let response;
+    try {
+      response = await fetch(endpoint, change === undefined ? {} : {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(change),
+      });
+    } catch {
+      throw new Error('连接失败，请重试。');
+    }
     if (response.status === 401) {
       location.assign('/admin');
       throw new Error('登录已过期，请重新登录。');
     }
-    const payload = await response.json();
+    const payload = await response.json().catch(() => { throw new Error('服务暂时无法响应，请重试。'); });
     if (!response.ok) throw new Error(payload.error || '操作失败，请重试。');
     return payload;
   }
@@ -53,6 +59,11 @@
   function notify(message, error = false) {
     feedback.textContent = message;
     feedback.dataset.error = String(error);
+  }
+
+  function showStatus(element, text, state = 'idle') {
+    element.textContent = text;
+    element.dataset.state = state;
   }
 
   async function switchView(next) {
@@ -100,15 +111,21 @@
     const label = labels[view];
     page.innerHTML = `<div class="admin-page-head"><div><h2>${label}</h2><p>管理已发布内容和草稿。</p></div><button type="button" class="primary" id="new-item">新建${label}</button></div>
       <div class="admin-list"><div class="admin-filters"><label><span>搜索${label}</span><input type="search" id="item-query" placeholder="按标题查找"></label>
-      <label><span>发布状态</span><select id="item-status"><option value="">全部</option><option value="published">已发布</option><option value="draft">草稿</option>${view === 'posts' ? '<option value="revision">有草稿</option>' : ''}</select></label><p class="subtle" id="item-count" role="status"></p></div><div id="item-rows"></div></div>`;
+      <label><span>发布状态</span><select id="item-status"><option value="">全部</option><option value="published">已发布</option><option value="draft">草稿</option>${view === 'posts' ? '<option value="revision">有草稿</option>' : ''}</select></label><p class="admin-action-status" id="list-result" role="status"></p><p class="subtle" id="item-count" role="status"></p></div><div id="item-rows"></div></div>`;
     const query = page.querySelector('#item-query');
     const state = page.querySelector('#item-status');
     const rows = page.querySelector('#item-rows');
+    const result = page.querySelector('#list-result');
+    if (listFilters[view]) {
+      query.value = listFilters[view].query;
+      state.value = listFilters[view].status;
+    }
     function articleMetrics(id) {
       const engagement = data.engagement?.[id];
       return `<small class="admin-article-stats"><span>浏览 ${engagement?.views ?? 0}</span><span>评论 ${data.comments?.[id]?.length ?? 0}</span><span>点赞 ${engagement?.likes.length ?? 0}</span></small>`;
     }
     function refresh() {
+      listFilters[view] = {query:query.value,status:state.value};
       const keyword = query.value.trim().toLowerCase();
       const visible = data[view].filter(item => (!state.value || item.status === state.value || (state.value === 'revision' && item.draft)) && [item.title,item.draft?.title].some(title => title?.toLowerCase().includes(keyword)));
       page.querySelector('#item-count').textContent = `共 ${visible.length} 条`;
@@ -119,7 +136,7 @@
     page.querySelector('#new-item').addEventListener('click', () => openEditor());
     rows.addEventListener('click', async event => {
       const button = event.target.closest('button');
-      if (!button) return;
+      if (!button || busy) return;
       if (button.id === 'reset-items') {
         query.value = '';
         state.value = '';
@@ -128,48 +145,39 @@
       } else if (button.dataset.edit) openEditor(data[view].find(item => item.id === button.dataset.edit));
       else if (button.dataset.delete) {
         const item = data[view].find(item => item.id === button.dataset.delete);
-        if (await confirmAction('删除这条内容？',`「${item.title}」将从后台和前台移除。`,'确认删除',true)) {
-          save({collection:view,id:item.id,item:null}, '已删除。');
+        if (await confirmAction(`删除${label}？`,`「${item.title}」将从后台和前台移除。`,'确认删除',true)) {
+          const nextRow = button.closest('li').nextElementSibling || button.closest('li').previousElementSibling;
+          const nextId = nextRow?.querySelector('[data-edit]').dataset.edit;
+          await save({collection:view,id:item.id,item:null},{
+            pending:'正在删除…', message:`已删除「${item.title}」。`, status:result, buttons:[button],
+            onSaved() {
+              refresh();
+              ([...rows.querySelectorAll('[data-edit]')].find(button => button.dataset.edit === nextId) || query).focus({preventScroll:true});
+            }
+          });
         }
       }
     });
     refresh();
   }
 
-  async function save(change, message, form, automatic = false) {
+  async function save(change, {pending,message,status,form,buttons = [],onSaved}) {
     if (busy) return;
     busy = true;
-    const keepEditing = form && change.collection === 'posts' && change.item?.status === 'draft';
     const wasDirty = dirty;
-    if (keepEditing) dirty = false;
-    const buttons = form ? [...form.querySelectorAll('button[type=submit],#withdraw-post')] : [];
-    buttons.forEach(button => { button.disabled = true; });
-    const draftStatus = keepEditing && form.querySelector('.draft-save-status');
-    const report = (text, error = false) => {
-      if (!draftStatus) return notify(text,error);
-      draftStatus.textContent = text;
-      draftStatus.dataset.error = String(error);
-    };
-    report(automatic ? '正在自动保存…' : '正在保存…');
+    if (form) dirty = false;
+    buttons.forEach(button => button.setAttribute('aria-disabled','true'));
+    showStatus(status,pending,'pending');
     try {
       data = await api(change);
-      if (keepEditing) {
-        if (!change.id) {
-          // The server appends new articles to the returned list.
-          form.dataset.postId = data.posts.at(-1).id;
-          page.querySelector('.admin-page-head h2').textContent = '编辑文章';
-        }
-      } else {
-        dirty = false;
-        render();
-      }
-      report(keepEditing && dirty ? '有未保存的更改…' : message);
+      const feedback = onSaved?.() || status;
+      showStatus(feedback,dirty && form ? `${message}有新的改动待保存。` : message,'success');
     } catch (error) {
-      if (keepEditing) dirty ||= wasDirty;
-      report(automatic ? `自动保存失败。${error.message} 可点击「保存草稿」重试。` : error.message,true);
+      if (form) dirty ||= wasDirty;
+      showStatus(status,error.message,'error');
     } finally {
       busy = false;
-      buttons.forEach(button => { button.disabled = false; });
+      buttons.forEach(button => button.removeAttribute('aria-disabled'));
     }
   }
 
@@ -178,11 +186,17 @@
     form.addEventListener('change',onChange);
   }
 
-  function openEditor(entry = {}) {
+  function saveBar(buttons, initial = '') {
+    return `<div class="admin-save"><p class="admin-action-status" data-save-status role="status">${initial}</p><div class="admin-save-buttons">${buttons}</div></div>`;
+  }
+
+  function openEditor(entry = {}, focus = true) {
+    editorEvents?.abort();
     const collection = view;
     const isPost = collection === 'posts';
     const item = entry.draft || entry;
-    const published = isPost && entry.status === 'published';
+    let itemId = entry.id || '';
+    let published = isPost && entry.status === 'published';
     const today = new Date();
     const localDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     const status = select('status','发布状态', [['draft','草稿'],['published','已发布']], item.status || 'draft');
@@ -191,68 +205,145 @@
     const articleOptions = [['','无关联'],...data.posts.map(post => [post.id,post.title])];
     const fields = isPost ? `${select('topic','文章主题',Object.entries(data.topics),item.topic || Object.keys(data.topics)[0])}${date}` : `${kind}${collection === 'notes' ? date : select('post','关联文章',articleOptions,item.post || '')}${status}`;
     const details = `${textarea('text','简短说明',item.text,350)}${textarea('detail',collection === 'notes' ? '笔记正文（Markdown）' : '项目详情（Markdown）',item.detail,8000,false)}${collection === 'projects' ? input('url','项目链接',item.url,300,'url',false) : ''}`;
-    const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<p class="draft-save-status subtle" role="status">${item.status === 'draft' ? '草稿已保存。' : '编辑后自动保存草稿。'}</p><details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}<div class="admin-fields">${input('cover','封面图片地址',item.cover,500,'text',false)}${input('coverAlt','封面替代文字',item.coverAlt,150,'text',false)}</div></details></div><div class="editor-cover">${coverImage(item)}</div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
-    const actions = isPost ? `<p class="subtle">${published ? '保存草稿后，读者仍看到已发布版本。' : '发布后，文章会出现在博客上。'}</p><button type="submit" class="secondary" name="status" value="draft">保存草稿</button><button type="submit" class="primary" name="status" value="published">${published ? '发布更新' : '发布文章'}</button>` : `<button type="submit" class="primary">保存${labels[collection]}</button>`;
-    page.innerHTML = `<div class="admin-page-head"><div><button type="button" class="admin-back" id="return-list">返回${labels[collection]}列表</button><h2>${item.id ? '编辑' : '新建'}${labels[collection]}</h2></div>${published ? '<button type="button" class="secondary" id="withdraw-post">撤回发布</button>' : ''}</div>
-      <form id="content-form" class="admin-editor"><div class="admin-card ${isPost ? 'document-card' : ''}">${editorFields}</div><div class="admin-save">${actions}</div></form>`;
-    const form = page.querySelector('form');
-    const draftStatus = form.querySelector('.draft-save-status');
+    const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}<div class="admin-fields">${input('cover','封面图片地址',item.cover,500,'text',false)}${input('coverAlt','封面替代文字',item.coverAlt,150,'text',false)}</div></details></div><div class="editor-cover">${coverImage(item)}</div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
+    const actions = isPost ? `<a class="secondary" data-live-post target="_blank" rel="noopener" hidden>查看前台</a><button type="submit" class="secondary" name="status" value="draft">保存草稿</button><button type="submit" class="primary" name="status" value="published"></button>` : `<button type="submit" class="primary">保存${labels[collection]}</button>`;
+    const initial = isPost ? (entry.draft || entry.status === 'draft' ? '草稿已保存。' : '编辑后会自动保存草稿。') : '';
+    page.innerHTML = `<div class="admin-page-head"><div><button type="button" class="admin-back" id="return-list">← 返回${labels[collection]}列表</button><h2>${itemId ? '编辑' : '新建'}${labels[collection]}</h2></div>${isPost ? '<button type="button" class="secondary" id="withdraw-post" hidden>撤回发布</button>' : ''}</div>
+      <form id="content-form" class="admin-editor"><div class="admin-card ${isPost ? 'document-card' : ''}">${editorFields}</div>${saveBar(actions,initial)}</form>`;
+    const form = page.querySelector('#content-form');
+    const feedback = form.querySelector('[data-save-status]');
+    const withdraw = page.querySelector('#withdraw-post');
+    const buttons = [...form.querySelectorAll('[type=submit]'),...(withdraw ? [withdraw] : [])];
     let saveTimer;
+    let draftRequest;
+    let manualPending = false;
+
+    function updateEditor(saved) {
+      itemId = saved.id || '';
+      form.dataset.itemId = itemId;
+      if (itemId) page.querySelector('.admin-page-head h2').textContent = `编辑${labels[collection]}`;
+      if (!isPost) return;
+      published = saved.status === 'published';
+      withdraw.hidden = !published;
+      form.querySelector('[value=published]').textContent = published ? '发布更新' : '发布文章';
+      const live = form.querySelector('[data-live-post]');
+      live.hidden = !published;
+      if (published) live.href = `/#post/${itemId}`;
+    }
+    if (isPost) updateEditor(entry);
+
     function scheduleDraft() {
       dirty = true;
       clearTimeout(saveTimer);
-      draftStatus.dataset.error = 'false';
-      draftStatus.textContent = '有未保存的更改…';
+      if (!busy && !manualPending) showStatus(feedback,'有未保存的更改。');
       saveTimer = setTimeout(saveDraftWhenReady,1200);
     }
     const editor = isPost ? articleEditor(form.querySelector('#article-editor'), item, scheduleDraft) : null;
-    if (isPost) {
-      trackForm(form,event => {
+    trackForm(form,event => {
+      if (isPost) {
         if (['cover','coverAlt'].includes(event.target.name)) {
           form.querySelector('.editor-cover').innerHTML = coverImage({cover:form.elements.cover.value.trim(),coverAlt:form.elements.coverAlt.value.trim()});
         }
         if (!event.target.closest('#article-editor')) scheduleDraft();
-      });
-    } else trackForm(form);
-
-    function submitContent(status, automatic = false) {
-      const fields = Object.fromEntries(new FormData(form));
-      if (editor) {
-        fields.body = editor();
-        fields.status = status;
+      } else {
+        dirty = true;
+        if (!busy) showStatus(feedback,'有未保存的更改。');
       }
-      save({collection,id:form.dataset.postId || entry.id || '',item:fields}, fields.status === 'published' ? '已发布到博客。' : automatic ? '草稿已自动保存。' : '草稿已保存。', form, automatic);
+    });
+
+    function readFields(status) {
+      const values = Object.fromEntries(new FormData(form));
+      if (editor) {
+        values.body = editor();
+        values.status = status;
+      }
+      return values;
+    }
+
+    function submitContent(values, automatic = false) {
+      const isPublishing = isPost && values.status === 'published';
+      return save({collection,id:itemId,item:values},{
+        form,status:feedback,buttons:automatic ? [] : buttons,
+        pending:automatic ? '正在自动保存…' : isPublishing ? '正在发布…' : '正在保存…',
+        message:isPublishing ? '已发布到博客。' : isPost ? (automatic ? '草稿已自动保存。' : '草稿已保存。') : `${labels[collection]}已保存。`,
+        onSaved() { updateEditor(itemId ? data[collection].find(item => item.id === itemId) : data[collection].at(-1)); }
+      });
     }
 
     function saveDraftWhenReady() {
       if (!form.isConnected || !dirty) return;
-      if (busy || confirmation.open) {
+      if (busy || manualPending || confirmation.open) {
         saveTimer = setTimeout(saveDraftWhenReady,1200);
       } else if (!form.elements.title.value.trim()) {
-        draftStatus.textContent = '填写标题后自动保存。';
+        showStatus(feedback,'填写标题后会自动保存。');
       } else if (form.matches(':invalid')) {
-        draftStatus.textContent = '填写有效的发布设置后自动保存。';
-      } else submitContent('draft',true);
+        showStatus(feedback,'填写有效的发布设置后会自动保存。');
+      } else {
+        draftRequest = submitContent(readFields('draft'),true);
+      }
     }
     form.addEventListener('invalid', event => {
       const settings = event.target.closest('.publication-settings');
       if (settings) settings.open = true;
     },true);
     page.querySelector('#return-list').addEventListener('click', () => switchView(collection));
-    page.querySelector('#withdraw-post')?.addEventListener('click', async () => {
-      if (busy) return;
-      const detail = '撤回后，文章将保留为草稿，读者将暂时无法访问。';
-      if (await confirmAction('撤回发布？',detail + (dirty ? ' 尚未保存的改动会丢失。' : ''),'确认撤回')) {
+    withdraw?.addEventListener('click', async () => {
+      if (manualPending) return;
+      manualPending = true;
+      try {
+        await draftRequest;
+        if (!form.isConnected || busy || !published) return;
+        const detail = '撤回后，文章将保留为草稿，读者将暂时无法访问。';
+        if (!await confirmAction('撤回发布？',detail + (dirty ? ' 尚未保存的改动会丢失。' : ''),'确认撤回',true)) return;
         clearTimeout(saveTimer);
-        save({collection,id:entry.id,action:'withdraw'},'已撤回发布，文章保留为草稿。');
+        const discard = dirty;
+        await save({collection,id:itemId,action:'withdraw'},{
+          form,status:feedback,buttons,pending:'正在撤回…',message:'已撤回发布，文章保留为草稿。',
+          onSaved() {
+            const saved = data[collection].find(item => item.id === itemId);
+            if (discard && !dirty) {
+              openEditor(saved,false);
+              const next = page.querySelector('[data-save-status]');
+              page.querySelector('#return-list').focus({preventScroll:true});
+              return next;
+            }
+            updateEditor(saved);
+            form.querySelector('[value=draft]').focus({preventScroll:true});
+          }
+        });
+      } finally {
+        manualPending = false;
       }
     });
-    form.addEventListener('submit', event => {
+    form.addEventListener('submit', async event => {
       event.preventDefault();
-      clearTimeout(saveTimer);
-      submitContent(event.submitter?.value || 'draft');
+      if (manualPending) return;
+      manualPending = true;
+      try {
+        await draftRequest;
+        if (!form.isConnected || busy) return;
+        const status = event.submitter?.value || 'draft';
+        const values = readFields(status);
+        if (isPost && status === 'published') {
+          if (!values.summary.trim() || !values.body.trim()) {
+            showStatus(feedback,'发布前请填写文章摘要和正文。','error');
+            if (!values.summary.trim()) {
+              form.querySelector('.publication-settings').open = true;
+              form.elements.summary.focus({preventScroll:true});
+            }
+            return;
+          }
+          const action = published ? '发布更新' : '发布文章';
+          const detail = published ? '发布后，读者会看到本次编辑的版本。' : '发布后，读者可以在博客上看到这篇文章。';
+          if (!await confirmAction(`${action}？`,detail,action)) return;
+        }
+        clearTimeout(saveTimer);
+        await submitContent(values);
+      } finally {
+        manualPending = false;
+      }
     });
-    form.querySelector('[name=title]').focus();
+    if (focus) form.querySelector('[name=title]').focus();
   }
 
   function settingsForm() {
@@ -270,13 +361,19 @@
           <button type="submit" class="primary">保存新密码</button>
         </form>
       </details>
-      <form class="admin-editor"><div class="admin-card"><div class="admin-fields">${input('title','博客名称',settings.title,70)}${input('author','作者名称',settings.author,50)}</div>${textarea('description','首页介绍',settings.description,350)}${textarea('about','关于页正文（Markdown）',settings.about,8000)}${input('github','GitHub 链接',settings.github,300,'url',false)}${select('featured','首页置顶文章',featured,settings.featured)}</div><div class="admin-save"><button type="submit" class="primary">保存设置</button></div></form>
-      <section class="admin-card"><h3>静态站点导出</h3><p>导出已发布内容和站点设置，用于更新静态站点。草稿不会写入导出文件。</p><button type="button" class="secondary" id="export-site">导出公开 content.js</button></section>`;
+      <form class="admin-editor"><div class="admin-card"><div class="admin-fields">${input('title','博客名称',settings.title,70)}${input('author','作者名称',settings.author,50)}</div>${textarea('description','首页介绍',settings.description,350)}${textarea('about','关于页正文（Markdown）',settings.about,8000)}${input('github','GitHub 链接',settings.github,300,'url',false)}${select('featured','首页置顶文章',featured,settings.featured)}</div>${saveBar('<button type="submit" class="primary">保存设置</button>')}</form>
+      <section class="admin-card"><h3>静态站点导出</h3><p>导出已发布内容和站点设置，用于更新静态站点。草稿不会写入导出文件。</p><div class="admin-export"><button type="button" class="secondary" id="export-site">导出公开 content.js</button><span class="admin-action-status" id="export-result" role="status"></span></div></section>`;
     const form = page.querySelector('.admin-editor');
-    trackForm(form);
+    const saveResult = form.querySelector('[data-save-status]');
+    trackForm(form,() => {
+      dirty = true;
+      if (!busy) showStatus(saveResult,'有未保存的更改。');
+    });
     form.addEventListener('submit', event => {
       event.preventDefault();
-      save({collection:'settings',item:Object.fromEntries(new FormData(form))}, '站点设置已保存。', form);
+      save({collection:'settings',item:Object.fromEntries(new FormData(form))},{
+        form,status:saveResult,buttons:[form.querySelector('[type=submit]')],pending:'正在保存设置…',message:'站点设置已保存，前台已更新。'
+      });
     });
     const passwordForm = page.querySelector('#password-settings');
     passwordForm.addEventListener('submit', async event => {
@@ -305,12 +402,20 @@
         button.textContent = '保存新密码';
       }
     });
-    page.querySelector('#export-site').addEventListener('click', async () => {
+    page.querySelector('#export-site').addEventListener('click', async event => {
+      const button = event.currentTarget;
+      if (button.disabled) return;
+      const result = page.querySelector('#export-result');
+      button.disabled = true;
+      showStatus(result,'正在准备导出…','pending');
       try {
         const response = await fetch('/content.js');
-        if (!response.ok) throw new Error('公开内容导出失败。');
+        if (!response.ok) throw new Error();
         download('content.js',await response.text(),'text/javascript;charset=utf-8');
-      } catch (error) { notify(error.message,true); }
+        showStatus(result,'已发起下载。','success');
+      } catch {
+        showStatus(result,'公开内容导出失败，请重试。','error');
+      } finally { button.disabled = false; }
     });
   }
 
@@ -330,7 +435,7 @@
     if (!item.id) {
       try { legacy = localStorage.getItem('itfetter-draft') || ''; } catch {}
     }
-    root.innerHTML = `<div class="editor-toolbar"><div class="editor-modes" role="group" aria-label="正文编辑模式"><button type="button" data-mode="document">文档编辑</button><button type="button" data-mode="source">Markdown</button><button type="button" data-mode="preview">预览</button></div><button type="button" class="secondary" data-export>导出 .md</button></div>
+    root.innerHTML = `<div class="editor-toolbar"><div class="editor-modes" role="group" aria-label="正文编辑模式"><button type="button" data-mode="document">文档编辑</button><button type="button" data-mode="source">Markdown</button><button type="button" data-mode="preview">预览</button></div><div class="admin-export"><span class="admin-action-status" data-export-status role="status"></span><button type="button" class="secondary" data-export>导出 .md</button></div></div>
       ${legacy ? '<button type="button" class="secondary" data-restore>带入原浏览器草稿</button>' : ''}<div id="article-canvas"></div>`;
     const canvas = root.querySelector('#article-canvas');
     const exportButton = root.querySelector('[data-export]');
@@ -921,7 +1026,8 @@
         onEdit();
         paint();
       } else if ('export' in button.dataset) {
-        download(`${item.id || 'itfetter-draft'}.md`,markdown,'text/markdown;charset=utf-8');
+        download(`${root.closest('form').dataset.itemId || item.id || 'itfetter-draft'}.md`,markdown,'text/markdown;charset=utf-8');
+        showStatus(root.querySelector('[data-export-status]'),'已发起下载。','success');
       } else if (button.dataset.axis) {
         if (tableTarget === button) {
           closeTableMenu();

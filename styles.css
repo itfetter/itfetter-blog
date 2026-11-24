@@ -4,21 +4,21 @@
   color-scheme:light;
   --bg:#fff;--surface:#fff;--subtle:#f7f8fa;--hover:#f1f3f6;
   --ink:#16191f;--muted:#545c6b;--line:#e2e6ed;--strong-line:#cdd3de;
-  --accent:#204fbb;--accent-hover:#194298;--selected:#edf3ff;--on-accent:#fff;
+  --accent:#204fbb;--accent-hover:#194298;--selected:#edf3ff;--on-accent:#fff;--danger-ink:#a32332;
   --mono:ui-monospace,SFMono-Regular,Consolas,monospace
 }
 :root[data-theme=dark] {
   color-scheme:dark;
   --bg:#15171b;--surface:#1a1d23;--subtle:#20242b;--hover:#272c34;
   --ink:#f0f2f5;--muted:#b2bac7;--line:#303641;--strong-line:#465063;
-  --accent:#9bb9ff;--accent-hover:#c1d2ff;--selected:#252f45;--on-accent:#101a2f
+  --accent:#9bb9ff;--accent-hover:#c1d2ff;--selected:#252f45;--on-accent:#101a2f;--danger-ink:#ff9ca1
 }
 @media(prefers-color-scheme:dark){
   :root:not([data-theme]){
     color-scheme:dark;
     --bg:#15171b;--surface:#1a1d23;--subtle:#20242b;--hover:#272c34;
     --ink:#f0f2f5;--muted:#b2bac7;--line:#303641;--strong-line:#465063;
-    --accent:#9bb9ff;--accent-hover:#c1d2ff;--selected:#252f45;--on-accent:#101a2f
+    --accent:#9bb9ff;--accent-hover:#c1d2ff;--selected:#252f45;--on-accent:#101a2f;--danger-ink:#ff9ca1
   }
 }
 *{box-sizing:border-box}
@@ -247,14 +247,27 @@ pre{overflow:auto;margin:0;padding:11px 14px;font:.875rem/1.7 var(--mono)}
 .admin-state.published{color:var(--accent);background:var(--selected);border-color:transparent}
 .admin-states{display:flex;flex-wrap:wrap;gap:4px}
 .admin-item-title{display:block}
-.admin-row-actions{display:flex;align-items:center;gap:3px;font-size:.875rem}
-.admin-row-actions a{color:var(--accent);padding:7px}
+.admin-row-actions{display:flex;align-items:center;gap:4px;font-size:.875rem}
+.admin-row-actions :is(a,button){display:inline-flex;align-items:center;min-height:36px;padding:4px 8px;border-radius:6px}
+.admin-row-actions a{color:var(--accent)}
+.admin-row-actions a:hover{background:var(--selected)}
+.admin-row-actions button[data-delete]{color:var(--muted)}
+.admin-row-actions button[data-delete]:hover{color:var(--danger-ink)}
 .admin-empty{padding:14px;color:var(--muted)}
 .admin-empty button{margin-top:7px}
-.admin-back{font-size:.875rem;color:var(--accent);padding-left:0}
+.admin-back{font-size:.875rem;color:var(--accent);padding-left:0;min-height:36px}
 .admin-back:hover{text-decoration:underline}
 .admin-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(140px,100%),1fr));gap:10px}
-.admin-save{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:12px;margin:12px 0}
+.admin-save{position:sticky;bottom:0;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;margin:12px 0;border-top:1px solid var(--line);background:var(--surface)}
+.admin-save-buttons,.admin-export{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.admin-save-buttons{justify-content:flex-end;flex:none}
+.admin-workspace [hidden]:is(a,button){display:none}
+.admin-action-status{color:var(--muted);font-size:.875rem;line-height:1.5;overflow-wrap:anywhere}
+.admin-action-status[data-state=success]{color:var(--accent)}
+.admin-action-status[data-state=error]{color:var(--danger-ink)}
+.admin-action-status[data-state=pending]{color:var(--ink)}
+.admin-workspace [aria-disabled=true]{cursor:wait;opacity:.65;transform:none}
+.admin-export{min-width:0}
 .article-comments{border-top:1px solid var(--line);margin-top:36px;padding-top:24px}
 .discussion-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 12px;margin-bottom:16px}
 .discussion-heading h2{margin:0}
@@ -291,7 +304,8 @@ pre{overflow:auto;margin:0;padding:11px 14px;font:.875rem/1.7 var(--mono)}
 #admin-confirm h2{font-size:1.15rem;margin-bottom:8px}
 #admin-confirm p{color:var(--muted)}
 #admin-confirm .actions{justify-content:flex-end;margin-top:24px}
-.danger-button{border:1px solid #a32332;border-radius:8px;background:#a32332;color:#fff;padding:8px 13px;min-height:42px}
+.danger-button{display:inline-flex;align-items:center;justify-content:center;border:1px solid #a32332;border-radius:8px;background:#a32332;color:#fff;padding:5px 12px;min-height:42px;font-size:.875rem;font-weight:600}
+.danger-button:hover{background:#861b28;border-color:#861b28}
 .editor-toolbar{display:flex;justify-content:space-between;align-items:center;gap:7px;flex-wrap:wrap;border-block:1px solid var(--line);padding:7px 0;margin-top:7px}
 .editor-modes{display:flex;gap:4px}
 .editor-modes button{min-height:39px;padding:6px 8px;font-size:.875rem;border:0;border-radius:7px;background:transparent}
@@ -304,8 +318,6 @@ pre{overflow:auto;margin:0;padding:11px 14px;font:.875rem/1.7 var(--mono)}
 .editor-cover .cover-image{aspect-ratio:2.1}
 .document-header .admin-field>input[name=title]{border-color:transparent;padding:2px 0;font-size:clamp(1.65rem,4vw,2.35rem);font-weight:750;letter-spacing:-.04em}
 .document-header .admin-field>input[name=title]:focus{outline-offset:2px}
-.draft-save-status{min-height:1.5em}
-.draft-save-status[data-error=true]{color:var(--ink);border-inline-start:2px solid var(--accent);padding-inline-start:8px}
 .publication-settings{margin-top:8px}
 .publication-settings summary{width:fit-content;cursor:pointer;color:var(--muted);padding:5px 0;font-size:.875rem}
 .publication-settings[open]>:is(.admin-fields,.admin-field){margin-bottom:8px}
@@ -451,6 +463,8 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:.875rem}
   .admin-nav{display:flex;flex-wrap:wrap}
   .admin-workspace{padding-top:14px}
   .admin-page-head{align-items:start}
+  .admin-save{display:grid;gap:6px}
+  .admin-save .admin-action-status{min-height:1.5em}
   .admin-list li{grid-template-columns:minmax(0,1fr) auto}
   .admin-row-actions{grid-column:1/-1;justify-self:end}
   .admin-row-actions :is(a,button){min-height:42px}
