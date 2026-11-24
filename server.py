@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 import secrets
 from http import HTTPStatus
 from http.cookies import CookieError, SimpleCookie
@@ -30,6 +31,7 @@ CONTENT_LOCK = Lock()
 # These are the requested defaults for the loopback-only preview.
 ADMIN_USERNAME = "amdin"
 ADMIN_PASSWORD = "123456"
+COOKIE_SECURITY = ""
 
 
 class BlogHandler(BaseHTTPRequestHandler):
@@ -158,7 +160,7 @@ class BlogHandler(BaseHTTPRequestHandler):
             return
         if path == "/admin/logout":
             SESSIONS.discard(self.session_token())
-            self.redirect_to_admin(f"{SESSION_COOKIE}=; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=0")
+            self.redirect_to_admin(f"{SESSION_COOKIE}=; Path=/admin; HttpOnly; SameSite=Strict; Max-Age=0{COOKIE_SECURITY}")
             return
         if path != "/admin/login":
             self.send_error(HTTPStatus.NOT_FOUND)
@@ -176,7 +178,7 @@ class BlogHandler(BaseHTTPRequestHandler):
         SESSIONS.discard(self.session_token())
         token = secrets.token_urlsafe(32)
         SESSIONS.add(token)
-        self.redirect_to_admin(f"{SESSION_COOKIE}={token}; Path=/admin; HttpOnly; SameSite=Strict")
+        self.redirect_to_admin(f"{SESSION_COOKIE}={token}; Path=/admin; HttpOnly; SameSite=Strict{COOKIE_SECURITY}")
 
     def handle_post_stats(self):
         post_id = parse_qs(urlsplit(self.path).query).get("post", [""])[0]
@@ -191,7 +193,7 @@ class BlogHandler(BaseHTTPRequestHandler):
             cookie = None
             if not visitor or len(visitor) != 32 or any(char not in "0123456789abcdef" for char in visitor):
                 visitor = secrets.token_hex(16)
-                cookie = f"{VISITOR_COOKIE}={visitor}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000"
+                cookie = f"{VISITOR_COOKIE}={visitor}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000{COOKIE_SECURITY}"
             with CONTENT_LOCK:
                 data = read_content()
                 stats, changed = update_engagement(data, post_id, visitor, action)
@@ -255,8 +257,19 @@ class BlogHandler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the itfetter localhost blog preview.")
-    parser.add_argument("--port", type=int, default=8081)
+    parser.add_argument("--port", type=int, default=os.environ.get("BLOG_PORT", "8081"))
+    parser.add_argument("--production", action="store_true", help="Require a dedicated password file and HTTPS cookies.")
     args = parser.parse_args()
+    if args.production:
+        ADMIN_USERNAME = os.environ.get("BLOG_ADMIN_USERNAME", "admin")
+        try:
+            password_file = Path(os.environ.get("BLOG_ADMIN_PASSWORD_FILE", "/run/secrets/blog-admin-password"))
+            ADMIN_PASSWORD = password_file.read_text(encoding="utf-8").rstrip("\r\n")
+        except OSError:
+            parser.error("Could not read the production admin password file.")
+        if not ADMIN_USERNAME.strip() or len(ADMIN_PASSWORD) < 16:
+            parser.error("Production requires an admin username and a password with at least 16 characters.")
+        COOKIE_SECURITY = "; Secure"
     with ThreadingHTTPServer(("127.0.0.1", args.port), BlogHandler) as server:
         print(f"Blog preview: http://127.0.0.1:{server.server_port}/")
         try:

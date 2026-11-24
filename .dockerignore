@@ -1,0 +1,12 @@
+*
+!Dockerfile
+!server.py
+!content_store.py
+!content.js
+!index.html
+!styles.css
+!markdown.js
+!studio.html
+!admin.js
+!assets/
+!assets/**

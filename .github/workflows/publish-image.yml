@@ -1,0 +1,55 @@
+name: Publish blog image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-image.yml'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'assets/**'
+      - '*.py'
+      - '*.js'
+      - '*.css'
+      - '*.html'
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-blog-image
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      IMAGE: ghcr.io/itfetter/itfetter-blog-dev-notes
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Build
+        run: docker build --pull --tag "$IMAGE:$GITHUB_SHA" .
+      - name: Verify image starts and serves the blog
+        shell: bash
+        run: |
+          set -euo pipefail
+          password_file=$(mktemp)
+          trap 'docker rm -f blog-smoke >/dev/null 2>&1 || true; rm -f "$password_file"' EXIT
+          openssl rand -hex 24 > "$password_file"
+          chmod 444 "$password_file"
+          docker run -d --name blog-smoke --network host \
+            -e BLOG_PORT=3101 -v "$password_file:/run/secrets/blog-admin-password:ro" "$IMAGE:$GITHUB_SHA"
+          curl --fail --silent --show-error --retry 8 --retry-connrefused http://127.0.0.1:3101/content.js -o /dev/null
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:3101/admin/content)" = 401
+      - name: Publish Git SHA and latest tags
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker tag "$IMAGE:$GITHUB_SHA" "$IMAGE:latest"
+          docker push "$IMAGE:latest"

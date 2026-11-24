@@ -1,4 +1,5 @@
 import json
+import os
 import secrets
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -7,7 +8,7 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent
 SEED = ROOT / "content.js"
-DATA = ROOT / "blog-data.json"
+DATA = Path(os.environ.get("BLOG_DATA_DIR", ROOT)) / "blog-data.json"
 COLLECTIONS = ("posts", "notes", "projects")
 
 

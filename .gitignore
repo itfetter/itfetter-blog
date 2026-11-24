@@ -1,3 +1,6 @@
 /blog-data.json
 /blog-data.tmp
 __pycache__/
+/deploy/.env
+/deploy/data/
+/deploy/secrets/

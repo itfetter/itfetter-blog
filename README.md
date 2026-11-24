@@ -18,6 +18,14 @@
 
 ## 部署
 
+GitHub Actions 构建并检验 Linux 镜像，发布到 `ghcr.io/itfetter/itfetter-blog-dev-notes`。服务器使用 [Compose 配置](deploy/compose.yaml)，本机反代目标默认是 `http://127.0.0.1:3101`。
+
+首次部署时，在 Compose 文件旁创建 `data/` 与 `secrets/`。容器使用 UID/GID `10001:10001`，需要写入 `data/` 和读取 `secrets/blog-admin-password`。密码文件须包含至少 16 个字符，限制为容器用户可读。生产后台默认用户名为 `admin`，登录 Cookie 通过 HTTPS 使用。
+
+更新时，在实例目录设置 `BLOG_IMAGE` 为目标 GHCR 镜像摘要，再执行 `docker compose pull` 和 `docker compose up -d`。备份和恢复时保留 `data/blog-data.json`，其中包含文章、草稿、评论和统计。反向代理与域名由服务器单独配置。
+
+### 静态导出
+
 在后台「站点设置」导出公开 `content.js`，将它与 `index.html`、`styles.css`、`markdown.js` 和 `assets/` 一起发布到静态站点根目录。导出的内容仅含已发布条目。发布后检查首页和 `#post/` 直达链接。本地管理服务仅监听 `127.0.0.1`，默认账号和密码用于本机预览。
 
 首页文章列表、归档和正文目录显示评论总数，计入回复。正文讨论区支持昵称留言、行内代码和回复。评论内容存放在 `blog-data.json`，由同源 Python 接口读取和发布。静态导出的评论数为导出时的快照。
