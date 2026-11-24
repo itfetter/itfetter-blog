@@ -20,9 +20,11 @@
 
 GitHub Actions 构建并检验 Linux 镜像，发布到 `ghcr.io/itfetter/itfetter-blog-dev-notes`。服务器使用 [Compose 配置](deploy/compose.yaml)，本机反代目标默认是 `http://127.0.0.1:3101`。
 
-首次部署时，在 Compose 文件旁创建 `data/` 与 `secrets/`。容器使用 UID/GID `10001:10001`，需要写入 `data/` 和读取 `secrets/blog-admin-password`。密码文件须包含至少 16 个字符，限制为容器用户可读。生产后台默认用户名为 `admin`，登录 Cookie 通过 HTTPS 使用。
+首次部署时，在 Compose 文件旁创建 `data/` 与 `secrets/`。容器使用 UID/GID `10001:10001`，需要写入 `data/` 和读取 `secrets/blog-admin-password`。初始密码文件须包含至少 16 个字符，限制为容器用户可读。生产后台默认用户名为 `admin`，登录 Cookie 通过 HTTPS 使用。
 
-更新时，在实例目录设置 `BLOG_IMAGE` 为目标 GHCR 镜像摘要，再执行 `docker compose pull` 和 `docker compose up -d`。备份和恢复时保留 `data/blog-data.json`，其中包含文章、草稿、评论和统计。反向代理与域名由服务器单独配置。
+登录后从「站点设置 → 修改登录密码」填写当前密码并确认新密码。新密码至少 6 位字符，保存后需重新登录。服务把新密码的加盐哈希保存在数据目录的 `admin-password.hash`，该文件优先于初始密码。
+
+更新时，在实例目录设置 `BLOG_IMAGE` 为目标 GHCR 镜像摘要，再执行 `docker compose pull` 和 `docker compose up -d`。备份时保留 `data/blog-data.json` 和已生成的 `data/admin-password.hash`。反向代理与域名由服务器单独配置。
 
 ### 静态导出
 

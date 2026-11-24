@@ -37,8 +37,8 @@
     });
   }
 
-  async function api(change) {
-    const response = await fetch('/admin/content', change === undefined ? {} : {
+  async function api(change, endpoint = '/admin/content') {
+    const response = await fetch(endpoint, change === undefined ? {} : {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(change),
     });
     if (response.status === 401) {
@@ -259,13 +259,51 @@
     const {settings} = data;
     const featured = [['','不置顶'],...data.posts.filter(post => post.status === 'published').map(post => [post.id,post.title])];
     page.innerHTML = `<div class="admin-page-head"><div><h2>站点设置</h2><p>保存后会更新前台首页、关于页和页脚。</p></div></div>
+      <details class="admin-card password-settings">
+        <summary>修改登录密码</summary>
+        <form id="password-settings" method="post" action="/admin/password">
+          <label class="admin-field">当前密码<input type="password" name="current" autocomplete="current-password" required></label>
+          <label class="admin-field">新密码<input type="password" name="new" autocomplete="new-password" minlength="6" maxlength="256" required aria-describedby="password-hint"></label>
+          <label class="admin-field">确认新密码<input type="password" name="confirm" autocomplete="new-password" minlength="6" maxlength="256" required></label>
+          <p id="password-hint">至少 6 位。保存后请使用新密码重新登录。</p>
+          <p class="form-error" role="alert" hidden></p>
+          <button type="submit" class="primary">保存新密码</button>
+        </form>
+      </details>
       <form class="admin-editor"><div class="admin-card"><div class="admin-fields">${input('title','博客名称',settings.title,70)}${input('author','作者名称',settings.author,50)}</div>${textarea('description','首页介绍',settings.description,350)}${textarea('about','关于页正文（Markdown）',settings.about,8000)}${input('github','GitHub 链接',settings.github,300,'url',false)}${select('featured','首页置顶文章',featured,settings.featured)}</div><div class="admin-save"><button type="submit" class="primary">保存设置</button></div></form>
       <section class="admin-card"><h3>静态站点导出</h3><p>导出已发布内容和站点设置，用于更新静态站点。草稿不会写入导出文件。</p><button type="button" class="secondary" id="export-site">导出公开 content.js</button></section>`;
-    const form = page.querySelector('form');
+    const form = page.querySelector('.admin-editor');
     trackForm(form);
     form.addEventListener('submit', event => {
       event.preventDefault();
       save({collection:'settings',item:Object.fromEntries(new FormData(form))}, '站点设置已保存。', form);
+    });
+    const passwordForm = page.querySelector('#password-settings');
+    passwordForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = passwordForm.querySelector('button');
+      if (button.disabled) return;
+      const error = passwordForm.querySelector('[role=alert]');
+      const values = Object.fromEntries(new FormData(passwordForm));
+      error.hidden = true;
+      if (values.new !== values.confirm) {
+        error.textContent = '两次输入的新密码不一致。';
+        error.hidden = false;
+        passwordForm.elements.confirm.focus();
+        return;
+      }
+      button.disabled = true;
+      button.textContent = '正在保存…';
+      try {
+        await api(values,'/admin/password');
+        passwordForm.reset();
+        location.assign('/admin?password=changed');
+      } catch (reason) {
+        error.textContent = reason.message;
+        error.hidden = false;
+        button.disabled = false;
+        button.textContent = '保存新密码';
+      }
     });
     page.querySelector('#export-site').addEventListener('click', async () => {
       try {

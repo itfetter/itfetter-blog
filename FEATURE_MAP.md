@@ -14,6 +14,7 @@
 | 搜索弹层 | `#search`、`search()`、`openSearch()`、`openResult()`、`#query` 键盘处理 | `/` 或 `Ctrl/Cmd+K`、正文关键词、无结果恢复、方向键、Enter 与 Esc |
 | 笔记和项目 | `notesPage()`、`projectsPage()`、`projectCards()`、`admin.js` 的 `openEditor()`、`content_store.py` 的 `update_content()` | 笔记分类和正文展开、项目详情与关联文章、后台 Markdown 保存 |
 | 后台登录 | `server.py` 的 `GET /admin`、`POST /admin/login`、`POST /admin/logout` | 未登录、错误密码、有效会话、退出、直接请求模板 |
+| 修改后台密码 | 站点设置的「修改登录密码」、`POST /admin/password`、数据目录下的 `admin-password.hash` | 校验当前密码和确认值、新密码至少 6 位、旧会话失效、重启后新密码可用 |
 | 后台栏目 | `admin.js` 初始化的 `requestedView` 和 `switchView()` | 栏目切换更新地址，刷新与直达恢复栏目，无效片段回到总览 |
 | 内容管理 | `admin.js` 的 `contentList()`、`openEditor()`、`confirmAction()`，`/admin/content`、`content_store.py` 的 `update_content()` | 搜索和状态筛选、文章浏览评论点赞数、新建编辑、撤回及删除确认 |
 | 文档编辑 | `admin.js` 的 `articleEditor()`、`snapshot()` 和 `stepHistory()`，`markdown.js` 的 `fromDocument()` 与 `clipboardBlocks()` | 连续输入、粘贴、块菜单贴边定位、选区格式工具栏、选区保留、列表项转换、Markdown 往返及撤销重做 |

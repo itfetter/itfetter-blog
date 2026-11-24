@@ -1,5 +1,7 @@
 /blog-data.json
 /blog-data.tmp
+/admin-password.hash
+/admin-password.tmp
 __pycache__/
 /deploy/.env
 /deploy/data/
