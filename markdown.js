@@ -84,11 +84,17 @@
     }).join('\n\n');
   }
 
+  function validImageSource(src) {
+    return /^(?:https?:\/\/|assets\/|\/media\/[a-f0-9]{32}\.(?:png|jpe?g|webp|gif)$)/i.test(src || '');
+  }
+
   function inline(text) {
     const tokens = [];
     const stash = html => `\uE000${tokens.push(html) - 1}\uE001`;
     const restore = value => value.replace(/\uE000(\d+)\uE001/g,(token,index) => tokens[index] ?? token);
     let escaped = escape(text).replace(/\x60([^\x60\n]+)\x60/g,(_,code) => stash(`<code>${code}</code>`));
+    escaped = escaped.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g,(match,alt,src) =>
+      validImageSource(src) ? stash(`<img class="article-image" src="${src}" alt="${alt}" loading="lazy" decoding="async">`) : match);
     const span = /&lt;span(?: data-ink=&quot;([a-z]+)&quot;)?(?: data-highlight=&quot;([a-z]+)&quot;)?&gt;((?:(?!&lt;\/?span\b)[^\n])*)&lt;\/span&gt;/g;
     let previous;
     do {
@@ -122,6 +128,10 @@
     };
     const formatted = node => {
       if (node.nodeType !== 1 || node.matches('br,script,style,button,[hidden]')) return plain(node);
+      if (node.matches('img')) {
+        const src = node.getAttribute('src')?.replace(/^\/admin\/media\//,'/media/');
+        return validImageSource(src) && !/[)\s]/.test(src) ? `![${node.alt.replace(/[\[\]\n]/g,'')}](${src})` : '';
+      }
       let text = [...node.childNodes].map(formatted).join('');
       if (!text.trim()) return text;
       if (node.matches('code,[data-inline-code]')) text = `\x60${plain(node)}\x60`;
@@ -239,9 +249,10 @@
     }).join('');
   }
 
-  function coverImage({cover, coverAlt}) {
-    if (!/^(?:https?:\/\/|assets\/)/i.test(cover || '')) return '';
-    return `<img class="cover-image" src="${escape(cover)}" alt="${escape(coverAlt || '')}" width="900" height="600" decoding="async">`;
+  function coverImage({cover, coverAlt}, admin = false) {
+    if (!validImageSource(cover)) return '';
+    const src = admin && cover.startsWith('/media/') ? '/admin' + cover : cover;
+    return `<img class="cover-image" src="${escape(src)}" alt="${escape(coverAlt || '')}" width="900" height="600" decoding="async">`;
   }
 
   window.addEventListener('error', event => {

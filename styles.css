@@ -164,6 +164,7 @@ h2.year{padding-bottom:8px;border-bottom:1px solid var(--line)}
 .article-engagement button{gap:6px}
 .article-engagement button[aria-pressed=true]{color:var(--accent);background:var(--selected);border-color:var(--accent)}
 .reading .cover-image{aspect-ratio:2.1;width:100%;height:auto;margin:20px 0 24px}
+.reading .article-image{display:block;max-width:100%;height:auto;margin-block:12px;border-radius:6px}
 .reading p{line-height:1.8;margin-bottom:14px;overflow-wrap:anywhere}
 .reading h2{font-size:1.4rem;margin:25px 0 8px;letter-spacing:-.025em}
 .article-grid .reading :is(h2,h3,h4,h5,h6){scroll-margin-top:var(--article-anchor-top)}
@@ -307,6 +308,7 @@ pre{overflow:auto;margin:0;padding:11px 14px;font:.875rem/1.7 var(--mono)}
 .danger-button{display:inline-flex;align-items:center;justify-content:center;border:1px solid #a32332;border-radius:8px;background:#a32332;color:#fff;padding:5px 12px;min-height:42px;font-size:.875rem;font-weight:600}
 .danger-button:hover{background:#861b28;border-color:#861b28}
 .editor-toolbar{display:flex;justify-content:space-between;align-items:center;gap:7px;flex-wrap:wrap;border-block:1px solid var(--line);padding:7px 0;margin-top:7px}
+.editor-upload-status:not(:empty){padding-block:6px 0}
 .editor-modes{display:flex;gap:4px}
 .editor-modes button{min-height:39px;padding:6px 8px;font-size:.875rem;border:0;border-radius:7px;background:transparent}
 .editor-modes button[aria-pressed=true]{color:var(--accent);background:var(--selected);font-weight:650}

@@ -1,5 +1,7 @@
 /blog-data.json
 /blog-data.tmp
+/blog.sqlite3*
+/uploads/
 /admin-password.hash
 /admin-password.tmp
 __pycache__/

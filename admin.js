@@ -2,7 +2,9 @@
   const page = document.querySelector('#admin-page');
   const feedback = document.querySelector('#admin-status');
   const confirmation = document.querySelector('#admin-confirm');
-  const {escape, blocks:parseMarkdown, source:markdownSource, render:renderMarkdown, fromDocument:readDocument, clipboardBlocks, coverImage, inkColors, highlightColors, schemeColor} = window.blogMarkdown;
+  const {escape, blocks:parseMarkdown, source:markdownSource, render:renderReading, fromDocument:readDocument, clipboardBlocks, coverImage, inkColors, highlightColors, schemeColor} = window.blogMarkdown;
+  const renderMarkdown = (...args) => renderReading(...args).replaceAll('src="/media/','src="/admin/media/');
+  const imageFormats = 'image/png,image/jpeg,image/webp,image/gif';
   const labels = {posts:'文章',notes:'笔记',projects:'项目'};
   const types = {p:'正文',h1:'一级标题',h2:'二级标题',h3:'三级标题',h4:'四级标题',h5:'五级标题',h6:'六级标题',ol:'有序列表',ul:'无序列表',quote:'引用',code:'代码块',table:'插入表格',callout:'高亮块'};
   const blockMarks = {p:'T',div:'T',quote:'❝',code:'‹›',table:'▦',callout:'<span class="callout-mark" aria-hidden="true"></span>'};
@@ -64,6 +66,17 @@
   function showStatus(element, text, state = 'idle') {
     element.textContent = text;
     element.dataset.state = state;
+  }
+
+  async function uploadImage(file) {
+    if (!file.size || file.size > 8 * 1024 * 1024) throw new Error('每张图片最大 8 MB。');
+    const response = await fetch('/admin/media',{method:'POST',body:file}).catch(() => {
+      throw new Error('连接失败，请重试。');
+    });
+    if (response.status === 413) throw new Error('图片超过上传大小限制。');
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || '图片上传失败，请重试。');
+    return result.url;
   }
 
   async function switchView(next) {
@@ -205,7 +218,7 @@
     const articleOptions = [['','无关联'],...data.posts.map(post => [post.id,post.title])];
     const fields = isPost ? `${select('topic','文章主题',Object.entries(data.topics),item.topic || Object.keys(data.topics)[0])}${date}` : `${kind}${collection === 'notes' ? date : select('post','关联文章',articleOptions,item.post || '')}${status}`;
     const details = `${textarea('text','简短说明',item.text,350)}${textarea('detail',collection === 'notes' ? '笔记正文（Markdown）' : '项目详情（Markdown）',item.detail,8000,false)}${collection === 'projects' ? input('url','项目链接',item.url,300,'url',false) : ''}`;
-    const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}<div class="admin-fields">${input('cover','封面图片地址',item.cover,500,'text',false)}${input('coverAlt','封面替代文字',item.coverAlt,150,'text',false)}</div></details></div><div class="editor-cover">${coverImage(item)}</div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
+    const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}<div class="admin-fields">${input('cover','封面图片地址',item.cover,500,'text',false)}${input('coverAlt','封面替代文字',item.coverAlt,150,'text',false)}</div><div class="admin-export"><button type="button" class="secondary" data-cover-upload>上传封面</button><input type="file" accept="${imageFormats}" hidden data-cover-file><span class="admin-action-status" role="status" data-cover-status></span></div></details></div><div class="editor-cover">${coverImage(item,true)}</div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
     const actions = isPost ? `<a class="secondary" data-live-post target="_blank" rel="noopener" hidden>查看前台</a><button type="submit" class="secondary" name="status" value="draft">保存草稿</button><button type="submit" class="primary" name="status" value="published"></button>` : `<button type="submit" class="primary">保存${labels[collection]}</button>`;
     const initial = isPost ? (entry.draft || entry.status === 'draft' ? '草稿已保存。' : '编辑后会自动保存草稿。') : '';
     page.innerHTML = `<div class="admin-page-head"><div><button type="button" class="admin-back" id="return-list">← 返回${labels[collection]}列表</button><h2>${itemId ? '编辑' : '新建'}${labels[collection]}</h2></div>${isPost ? '<button type="button" class="secondary" id="withdraw-post" hidden>撤回发布</button>' : ''}</div>
@@ -239,10 +252,32 @@
       saveTimer = setTimeout(saveDraftWhenReady,1200);
     }
     const editor = isPost ? articleEditor(form.querySelector('#article-editor'), item, scheduleDraft) : null;
+    if (isPost) {
+      const trigger = form.querySelector('[data-cover-upload]');
+      const picker = form.querySelector('[data-cover-file]');
+      const result = form.querySelector('[data-cover-status]');
+      trigger.onclick = () => picker.click();
+      picker.onchange = async () => {
+        const file = picker.files[0];
+        if (!file) return;
+        picker.value = '';
+        trigger.disabled = true;
+        showStatus(result,'正在上传封面…','pending');
+        try {
+          form.elements.cover.value = await uploadImage(file);
+          form.elements.cover.dispatchEvent(new Event('input',{bubbles:true}));
+          showStatus(result,'封面已添加。','success');
+        } catch (error) {
+          showStatus(result,error.message,'error');
+        } finally {
+          trigger.disabled = false;
+        }
+      };
+    }
     trackForm(form,event => {
       if (isPost) {
         if (['cover','coverAlt'].includes(event.target.name)) {
-          form.querySelector('.editor-cover').innerHTML = coverImage({cover:form.elements.cover.value.trim(),coverAlt:form.elements.coverAlt.value.trim()});
+          form.querySelector('.editor-cover').innerHTML = coverImage({cover:form.elements.cover.value.trim(),coverAlt:form.elements.coverAlt.value.trim()},true);
         }
         if (!event.target.closest('#article-editor')) scheduleDraft();
       } else {
@@ -435,10 +470,14 @@
     if (!item.id) {
       try { legacy = localStorage.getItem('itfetter-draft') || ''; } catch {}
     }
-    root.innerHTML = `<div class="editor-toolbar"><div class="editor-modes" role="group" aria-label="正文编辑模式"><button type="button" data-mode="document">文档编辑</button><button type="button" data-mode="source">Markdown</button><button type="button" data-mode="preview">预览</button></div><div class="admin-export"><span class="admin-action-status" data-export-status role="status"></span><button type="button" class="secondary" data-export>导出 .md</button></div></div>
+    root.innerHTML = `<div class="editor-toolbar"><div class="editor-modes" role="group" aria-label="正文编辑模式"><button type="button" data-mode="document">文档编辑</button><button type="button" data-mode="source">Markdown</button><button type="button" data-mode="preview">预览</button></div><div class="admin-export"><button type="button" class="secondary" data-image-upload>插入图片</button><input type="file" accept="${imageFormats}" multiple hidden data-image-file><button type="button" class="secondary" data-export>导出 .md</button></div></div>
+      <div class="admin-action-status editor-upload-status" data-editor-status role="status"></div>
       ${legacy ? '<button type="button" class="secondary" data-restore>带入原浏览器草稿</button>' : ''}<div id="article-canvas"></div>`;
     const canvas = root.querySelector('#article-canvas');
     const exportButton = root.querySelector('[data-export]');
+    const imageButton = root.querySelector('[data-image-upload]');
+    const imagePicker = root.querySelector('[data-image-file]');
+    const editorStatus = root.querySelector('[data-editor-status]');
     const typeButtons = Object.entries(types).map(([type,label]) => `<button type="button" data-type="${type}" aria-label="${label}" title="${label}">${blockIcon(type)}</button>`).join('');
     let documentEditor = null;
     let menu = null;
@@ -452,6 +491,7 @@
     let tableTarget = null;
     let menuBlock = null;
     let hoverOpened = false;
+    let uploading = false;
 
     function positionBlockOptions() {
       const handle = menu.querySelector('summary').getBoundingClientRect();
@@ -771,6 +811,7 @@
     function paint() {
       root.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.mode === mode)));
       exportButton.disabled = !markdown.trim();
+      imageButton.disabled = mode === 'preview' || uploading;
       documentEditor = null;
       menuBlock = null;
       activeTable = null;
@@ -1027,7 +1068,7 @@
         paint();
       } else if ('export' in button.dataset) {
         download(`${root.closest('form').dataset.itemId || item.id || 'itfetter-draft'}.md`,markdown,'text/markdown;charset=utf-8');
-        showStatus(root.querySelector('[data-export-status]'),'已发起下载。','success');
+        showStatus(editorStatus,'已发起下载。','success');
       } else if (button.dataset.axis) {
         if (tableTarget === button) {
           closeTableMenu();
@@ -1153,7 +1194,94 @@
       }
     });
 
+    function insertBlocks(blocks, range) {
+      const beforeRange = document.createRange();
+      beforeRange.selectNodeContents(documentEditor);
+      beforeRange.setEnd(range.startContainer,range.startOffset);
+      const afterRange = document.createRange();
+      afterRange.selectNodeContents(documentEditor);
+      afterRange.setStart(range.endContainer,range.endOffset);
+      const before = readDocument(beforeRange.cloneContents());
+      const after = readDocument(afterRange.cloneContents());
+      documentEditor.innerHTML = renderMarkdown([...before,...blocks,...after]);
+      placeCursor(documentEditor.children[before.length + blocks.length - 1],false);
+    }
+
+    async function insertImages(files) {
+      if (!files.length || mode === 'preview') return;
+      if (uploading) {
+        showStatus(editorStatus,'请等当前图片上传完成。','pending');
+        return;
+      }
+      const target = documentEditor || canvas.querySelector('textarea');
+      const range = activeRange?.cloneRange();
+      const sourceValue = documentEditor ? null : target.value;
+      const sourceSelection = documentEditor ? null : [target.selectionStart,target.selectionEnd];
+      uploading = imageButton.disabled = true;
+      showStatus(editorStatus,'正在上传图片…','pending');
+      try {
+        const uploads = await Promise.allSettled(files.map(uploadImage));
+        if (signal.aborted) return;
+        if (!target.isConnected) {
+          showStatus(editorStatus,'编辑模式已切换，请重新插入图片。','error');
+          return;
+        }
+        const blocks = uploads.filter(upload => upload.status === 'fulfilled')
+          .map(({value}) => ({type:'p',text:`![正文图片](${value})`}));
+        const failure = uploads.find(upload => upload.status === 'rejected');
+        if (blocks.length && sourceSelection) {
+          const [start,end] = target.value === sourceValue ? sourceSelection : [target.selectionStart,target.selectionEnd];
+          target.setRangeText(`\n\n${markdownSource(blocks)}\n\n`,start,end,'end');
+          target.dispatchEvent(new Event('input',{bubbles:true}));
+        } else if (blocks.length) {
+          applyEdit(() => {
+            const block = blockAt(range?.startContainer);
+            if (!range || !documentEditor.contains(range.commonAncestorContainer) || block?.matches('pre,.code-panel,.table-scroll,table')) {
+              const next = block?.nextElementSibling;
+              (block || documentEditor).insertAdjacentHTML(block ? 'afterend' : 'beforeend',renderMarkdown(blocks) + (next ? '' : '<p><br></p>'));
+              placeCursor(next || documentEditor.lastElementChild);
+              return;
+            } else {
+              insertBlocks(blocks,range);
+            }
+            const selection = window.getSelection();
+            const inserted = blockAt(selection.anchorNode);
+            if (!inserted?.matches('p') || !inserted.querySelector('img')) return;
+            let next = inserted.nextElementSibling;
+            if (!next) {
+              inserted.insertAdjacentHTML('afterend','<p><br></p>');
+              next = inserted.nextElementSibling;
+            }
+            placeCursor(next);
+          });
+        }
+        const count = blocks.length;
+        showStatus(editorStatus,failure
+          ? `${count ? `已插入 ${count} 张。 ` : ''}${failure.reason.message}`
+          : `已插入 ${count} 张图片。`,failure ? 'error' : 'success');
+      } finally {
+        uploading = false;
+        imageButton.disabled = mode === 'preview';
+      }
+    }
+
+    imageButton.onclick = () => imagePicker.click();
+    imagePicker.onchange = () => {
+      const files = [...imagePicker.files];
+      imagePicker.value = '';
+      insertImages(files);
+    };
+
     canvas.addEventListener('paste', event => {
+      if (mode !== 'preview') {
+        const files = [...event.clipboardData.files].filter(file => file.type.startsWith('image/'));
+        if (files.length) {
+          event.preventDefault();
+          if (documentEditor) trackSelection(false);
+          insertImages(files);
+          return;
+        }
+      }
       if (!documentEditor?.contains(event.target)) return;
       const text = event.clipboardData.getData('text/plain');
       const html = event.clipboardData.getData('text/html');
@@ -1169,17 +1297,7 @@
         if (blocks.length === 1 && blocks[0].type === 'p') {
           document.execCommand('insertHTML',false,renderMarkdown(blocks).slice(3,-4));
         } else if (blocks.length && activeRange) {
-          // Rebuild the selected span from document blocks so a paste into a heading cannot nest the pasted paragraphs inside it.
-          const beforeRange = document.createRange();
-          beforeRange.selectNodeContents(documentEditor);
-          beforeRange.setEnd(activeRange.startContainer,activeRange.startOffset);
-          const afterRange = document.createRange();
-          afterRange.selectNodeContents(documentEditor);
-          afterRange.setStart(activeRange.endContainer,activeRange.endOffset);
-          const before = readDocument(beforeRange.cloneContents());
-          const after = readDocument(afterRange.cloneContents());
-          documentEditor.innerHTML = renderMarkdown([...before,...blocks,...after]);
-          placeCursor(documentEditor.children[before.length + blocks.length - 1],false);
+          insertBlocks(blocks,activeRange);
         }
       });
     });

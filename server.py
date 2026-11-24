@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import secrets
+import sqlite3
 from hashlib import pbkdf2_hmac
 from http import HTTPStatus
 from http.cookies import CookieError, SimpleCookie
@@ -10,7 +11,7 @@ from pathlib import Path
 from threading import Lock
 from urllib.parse import parse_qs, urlsplit
 
-from content_store import DATA, add_article_comment, article_comments, public_script, read_content, update_content, update_engagement, write_content
+from content_store import DATA, MEDIA_URL, database, initialize_store, public_script, read_content, save_change, store_comments, store_engagement
 
 
 ROOT = Path(__file__).resolve().parent
@@ -28,12 +29,15 @@ STATIC_FILES = {
 SESSION_COOKIE = "itfetter_session"
 VISITOR_COOKIE = "itfetter_reader"
 SESSIONS = set()
-CONTENT_LOCK = Lock()
 AUTH_LOCK = Lock()
+UPLOAD_DIR = DATA.parent / "uploads"
+IMAGE_TYPES = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "webp": "image/webp"}
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
 PASSWORD_HASH_FILE = DATA.with_name("admin-password.hash")
 # These are the requested defaults for the loopback-only preview.
-ADMIN_USERNAME = "amdin"
-ADMIN_PASSWORD = "123456"
+ADMIN_USERNAME = os.environ.get("BLOG_ADMIN_USERNAME", "admin")
+PREVIEW_PASSWORD = os.environ.get("BLOG_PREVIEW_PASSWORD")
+ADMIN_PASSWORD = PREVIEW_PASSWORD or secrets.token_urlsafe(12)
 PASSWORD_HASH = b""
 COOKIE_SECURITY = ""
 
@@ -67,6 +71,8 @@ class BlogHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(content)))
         if private:
             self.send_header("Cache-Control", "no-store")
+        if content_type.startswith("image/"):
+            self.send_header("X-Content-Type-Options", "nosniff")
         if cookie:
             self.send_header("Set-Cookie", cookie)
         self.end_headers()
@@ -140,17 +146,19 @@ class BlogHandler(BaseHTTPRequestHandler):
             filename, content_type = STATIC_FILES[path]
             self.send_content(HTTPStatus.OK, (ROOT / filename).read_bytes(), content_type)
         elif path == "/content.js":
-            with CONTENT_LOCK:
-                content = public_script(read_content())
+            with database() as db:
+                content = public_script(read_content(db, public=True))
             self.send_content(HTTPStatus.OK, content.encode("utf-8"), "text/javascript; charset=utf-8", private=True)
+        elif path.startswith(("/media/", "/admin/media/")):
+            self.serve_image(path)
         elif path == "/api/comments":
             self.handle_comments()
         elif path in ("/admin/content", "/admin/editor.js"):
             if self.session_token() not in SESSIONS:
                 self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "请重新登录后台。"})
             elif path == "/admin/content":
-                with CONTENT_LOCK:
-                    data = read_content()
+                with database() as db:
+                    data = read_content(db)
                 self.send_json(HTTPStatus.OK, data)
             else:
                 self.send_content(HTTPStatus.OK, (ROOT / "admin.js").read_bytes(), "text/javascript; charset=utf-8", private=True)
@@ -171,6 +179,9 @@ class BlogHandler(BaseHTTPRequestHandler):
             return
         if path == "/admin/password":
             self.change_password()
+            return
+        if path == "/admin/media":
+            self.upload_image()
             return
         if path == "/api/comments":
             self.handle_comments()
@@ -258,16 +269,13 @@ class BlogHandler(BaseHTTPRequestHandler):
             if not visitor or len(visitor) != 32 or any(char not in "0123456789abcdef" for char in visitor):
                 visitor = secrets.token_hex(16)
                 cookie = f"{VISITOR_COOKIE}={visitor}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000{COOKIE_SECURITY}"
-            with CONTENT_LOCK:
-                data = read_content()
-                stats, changed = update_engagement(data, post_id, visitor, action)
-                if changed:
-                    write_content(data)
+            with database(write=True) as db:
+                stats = store_engagement(db, post_id, visitor, action)
         except LookupError as error:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": str(error)})
         except (ValueError, UnicodeError) as error:
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
-        except OSError:
+        except (OSError, sqlite3.Error):
             self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "文章统计暂时无法读取或保存。"})
         else:
             self.send_json(HTTPStatus.OK, stats, cookie=cookie)
@@ -280,18 +288,14 @@ class BlogHandler(BaseHTTPRequestHandler):
                 if self.headers.get_content_type() != "application/json" or not length.isdecimal() or not 0 < int(length) <= 26000:
                     raise ValueError("评论格式有误或内容过长。")
                 payload = json.loads(self.rfile.read(int(length)))
-            with CONTENT_LOCK:
-                data = read_content()
-                if self.command == "POST":
-                    comments = add_article_comment(data, post_id, payload)
-                    write_content(data)
-                else:
-                    comments = article_comments(data, post_id)
+            submit = self.command == "POST"
+            with database(write=submit) as db:
+                comments = store_comments(db, post_id, payload if submit else None, submit)
         except LookupError as error:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": str(error)})
         except (ValueError, UnicodeError) as error:
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
-        except OSError:
+        except (OSError, sqlite3.Error):
             self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "评论暂时无法读取或保存。"})
         else:
             self.send_json(HTTPStatus.OK, comments)
@@ -306,17 +310,60 @@ class BlogHandler(BaseHTTPRequestHandler):
             return
         try:
             change = json.loads(self.rfile.read(int(length)))
-            with CONTENT_LOCK:
-                data = read_content()
-                update_content(data, change)
-                write_content(data)
+            with database(write=True) as db:
+                data = save_change(db, change)
         except (ValueError, UnicodeError) as error:
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(error)})
             return
-        except OSError:
+        except (OSError, sqlite3.Error):
             self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "文件未能保存，请检查项目目录是否可写。"})
             return
         self.send_json(HTTPStatus.OK, data)
+
+    def upload_image(self):
+        if self.session_token() not in SESSIONS:
+            self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "请重新登录后台。"})
+            return
+        length = self.headers.get("Content-Length", "")
+        if not length.isdecimal() or not 0 < int(length) <= MAX_IMAGE_BYTES:
+            self.send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "每张图片最大 8 MB。"})
+            return
+        content = self.rfile.read(int(length))
+        kind = next((ext for ext, magic in (("png", b"\x89PNG\r\n\x1a\n"), ("jpg", b"\xff\xd8\xff"),
+                                           ("gif", b"GIF87a"), ("gif", b"GIF89a")) if content.startswith(magic)), None)
+        if content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+            kind = "webp"
+        if len(content) != int(length) or not kind:
+            self.send_json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "请选择 PNG、JPEG、WebP 或 GIF 图片。"})
+            return
+        name = f"{secrets.token_hex(16)}.{kind}"
+        try:
+            UPLOAD_DIR.mkdir(exist_ok=True)
+            (UPLOAD_DIR / name).write_bytes(content)
+        except OSError:
+            self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "图片保存失败，请重试。"})
+            return
+        self.send_json(HTTPStatus.CREATED, {"url": f"/media/{name}"})
+
+    def serve_image(self, path):
+        private = path.startswith("/admin/")
+        match = MEDIA_URL.fullmatch(path.removeprefix("/admin"))
+        if not match or (private and self.session_token() not in SESSIONS):
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        name = match[1]
+        if not private:
+            with database() as db:
+                published = db.execute("SELECT 1 FROM public_media WHERE name=? LIMIT 1", (name,)).fetchone()
+            if not published:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+        try:
+            content = (UPLOAD_DIR / name).read_bytes()
+        except FileNotFoundError:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        self.send_content(HTTPStatus.OK, content, IMAGE_TYPES[name.rsplit(".", 1)[1]], private=True)
 
 
 if __name__ == "__main__":
@@ -329,7 +376,6 @@ if __name__ == "__main__":
         if len(PASSWORD_HASH) != 48:
             parser.error("The stored admin password hash has an invalid format.")
     if args.production:
-        ADMIN_USERNAME = os.environ.get("BLOG_ADMIN_USERNAME", "admin")
         if not ADMIN_USERNAME.strip():
             parser.error("Production requires an admin username.")
         if not PASSWORD_HASH:
@@ -341,8 +387,13 @@ if __name__ == "__main__":
             if len(ADMIN_PASSWORD) < 16:
                 parser.error("Production requires an initial password with at least 16 characters.")
         COOKIE_SECURITY = "; Secure"
+    initialize_store()
     with ThreadingHTTPServer(("127.0.0.1", args.port), BlogHandler) as server:
         print(f"Blog preview: http://127.0.0.1:{server.server_port}/")
+        if not args.production:
+            print(f"Local preview login name: {ADMIN_USERNAME}")
+            if not PASSWORD_HASH and not PREVIEW_PASSWORD:
+                print(f"Temporary local preview password: {ADMIN_PASSWORD}")
         try:
             server.serve_forever()
         except KeyboardInterrupt:
