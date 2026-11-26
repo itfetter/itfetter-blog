@@ -1,5 +1,8 @@
 # itfetter-blog 开发约定
 
+## 项目 Harness
+从 [项目 Harness](.harness/README.md) 开工，查看 [当前任务](.harness/CURRENT.md) 和 [验证入口](.harness/VERIFY.md)。在状态变化、暂停、交接或交付时写回当前任务。记录实际验证范围、证据和下一步。
+
 ## 项目与目标
 
 这是 itfetter 的个人博客，面向想阅读个人项目过程、日常 AI 使用体验和开发笔记的人。优先保证文章容易找到、长文容易读、作者能持续写作和迁移内容。
