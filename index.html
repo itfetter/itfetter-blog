@@ -34,7 +34,7 @@
     <div class="search-heading"><h2 id="search-label">站内搜索</h2><form method="dialog"><button class="icon" aria-label="关闭搜索">×</button></form></div>
     <div class="search-form"><span class="lens" aria-hidden="true"></span><input type="search" id="query" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="results" aria-label="搜索关键词" placeholder="输入标题、主题或关键词" autocomplete="off" autofocus></div>
     <p class="search-count" id="search-count" role="status"></p>
-    <div class="search-results" id="results" role="listbox" aria-label="匹配文章"></div>
+    <div class="search-results" id="results" role="listbox" aria-label="搜索结果"></div>
     <div class="search-help"><span><kbd>↑</kbd> <kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 打开</span><span><kbd>Esc</kbd> 关闭</span></div>
   </dialog>
   <script src="./content.js"></script>
@@ -149,7 +149,7 @@
         <details class="toc toc-inline"><summary>本文目录</summary><div>${toc}</div></details>${cover(post)}<div id="article-body">${body}</div>
         ${related ? `<div class="related"><span class="subtle">继续阅读</span><br><a href="${postLink(related)}">${escapeHtml(related.title)}</a></div>` : ''}
         <section class="article-comments" aria-labelledby="section-comments"><div class="discussion-heading"><h2 id="section-comments" tabindex="-1">讨论与评论</h2><span class="comment-count" data-comment-count>${commentLabel(post)}</span></div>
-        <form class="comment-form" hidden><label>昵称<input name="author" maxlength="40" autocomplete="nickname" required></label><div class="comment-reply" hidden><span></span><button type="button" class="secondary">取消回复</button></div><label>评论<textarea name="body" rows="4" maxlength="2000" required placeholder="分享你的实践经验，或提一个问题"></textarea></label><div class="comment-form-actions"><small>支持行内代码 · Ctrl / ⌘ + Enter 发布</small><button type="submit" class="primary">发表评论</button></div></form>
+        <div class="comment-composer"><form class="comment-form" hidden><div class="comment-reply" hidden><strong></strong><button type="button">取消回复</button></div><label><span class="sr-only">评论内容</span><textarea name="body" rows="3" maxlength="2000" required placeholder="分享你的想法，或提一个问题"></textarea></label><div class="comment-form-actions"><label>昵称<input name="author" maxlength="40" autocomplete="nickname" required></label><button type="submit" class="primary">发表评论</button></div><p class="comment-feedback" data-compose-status role="status"></p></form></div>
         <p class="comment-feedback" role="status">正在加载评论…</p><button type="button" class="secondary comment-retry" hidden>重新加载</button><div class="comment-list"></div></section></article><nav class="toc" aria-label="本文目录"><strong>本文目录</strong>${toc}</nav></div>`;
     }
 
@@ -197,9 +197,13 @@
       const status = section.querySelector('.comment-feedback');
       const retry = section.querySelector('.comment-retry');
       const reply = section.querySelector('.comment-reply');
+      const home = form.parentElement;
+      const feedback = form.querySelector('[data-compose-status]');
       const submit = form.querySelector('[type=submit]');
       let comments = [];
       let parent = '';
+      let replyButton;
+      const drafts = new Map();
       const dates = new Intl.DateTimeFormat('zh-CN', {dateStyle:'medium',timeStyle:'short'});
 
       function display(items) {
@@ -215,7 +219,7 @@
         }
         const renderComment = item => {
           const body = escapeHtml(item.body).replace(/\x60([^\x60\n]+)\x60/g, '<code>$1</code>');
-          return `<article class="comment"><span class="comment-avatar" aria-hidden="true">${escapeHtml([...item.author][0] || '')}</span><div class="comment-content"><header><strong>${escapeHtml(item.author)}</strong>${item.sample ? '<span class="comment-sample">示例</span>' : ''}<time datetime="${escapeHtml(item.created)}">${dates.format(new Date(item.created))}</time></header><p>${body}</p>${item.parent ? '' : `<button type="button" class="comment-reply-button" data-reply="${item.id}">回复<span class="sr-only"> ${escapeHtml(item.author)}</span></button>`}</div></article>`;
+          return `<article class="comment" tabindex="-1" data-comment-id="${escapeHtml(item.id)}"><span class="comment-avatar" aria-hidden="true">${escapeHtml([...item.author][0] || '')}</span><div class="comment-content"><header><strong>${escapeHtml(item.author)}</strong>${item.sample ? '<span class="comment-sample">示例</span>' : ''}<time datetime="${escapeHtml(item.created)}">${dates.format(new Date(item.created))}</time></header><p>${body}</p>${item.parent ? '' : `<button type="button" class="comment-reply-button" aria-expanded="false" data-reply="${escapeHtml(item.id)}">回复<span class="sr-only"> ${escapeHtml(item.author)}</span></button>`}</div></article>`;
         };
         list.innerHTML = threads.length ? threads.map(item => {
           const children = replies.get(item.id);
@@ -225,11 +229,22 @@
         counts.forEach(count => { count.textContent = commentLabel(post); });
       }
 
-      function setReply(item) {
+      function setReply(item, button) {
+        drafts.set(parent, form.elements.body.value);
+        replyButton?.setAttribute('aria-expanded','false');
+        replyButton = button;
         parent = item?.id || '';
+        if (button) {
+          button.setAttribute('aria-expanded','true');
+          button.closest('.comment').after(form);
+        } else home.append(form);
+        form.classList.toggle('is-reply', Boolean(item));
+        form.elements.body.value = drafts.get(parent) || '';
+        form.elements.body.placeholder = item ? '写下你的回复' : '分享你的想法，或提一个问题';
         reply.hidden = !item;
-        reply.querySelector('span').textContent = item ? `正在回复 ${item.author}` : '';
+        reply.querySelector('strong').textContent = item ? `回复 ${item.author}` : '';
         submit.textContent = item ? '发布回复' : '发表评论';
+        feedback.textContent = '';
       }
 
       async function loadComments() {
@@ -248,11 +263,18 @@
       }
 
       retry.addEventListener('click',loadComments);
-      reply.querySelector('button').addEventListener('click', () => { setReply(); form.elements.body.focus(); });
+      function cancelReply() {
+        if (!replyButton || submit.disabled) return;
+        const trigger = replyButton;
+        setReply();
+        trigger.focus();
+      }
+      reply.querySelector('button').addEventListener('click', cancelReply);
       list.addEventListener('click', event => {
         const button = event.target.closest('[data-reply]');
-        if (button) {
-          setReply(comments.find(item => item.id === button.dataset.reply));
+        if (button && !submit.disabled) {
+          if (button === replyButton) { cancelReply(); return; }
+          setReply(comments.find(item => item.id === button.dataset.reply),button);
           form.elements.body.focus();
         }
       });
@@ -262,22 +284,26 @@
           if (!submit.disabled) form.requestSubmit();
         }
       });
+      form.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && replyButton && !event.isComposing) cancelReply();
+      });
       form.addEventListener('submit', async event => {
         event.preventDefault();
         if (submit.disabled) return;
         const body = {...Object.fromEntries(new FormData(form)),parent};
         submit.disabled = true;
-        status.textContent = '正在发布…';
+        feedback.textContent = '正在发布…';
         try {
           const response = await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || '发布失败，请重试。');
-          display(result);
           form.elements.body.value = '';
           setReply();
+          display(result);
+          list.querySelector(`[data-comment-id="${CSS.escape(result.at(-1).id)}"]`)?.focus();
           status.textContent = '已发布。';
         } catch (error) {
-          status.textContent = error instanceof SyntaxError || error instanceof TypeError ? '发布失败，请检查连接后重试。' : error.message;
+          feedback.textContent = error instanceof SyntaxError || error instanceof TypeError ? '发布失败，请检查连接后重试。' : error.message;
         } finally { submit.disabled = false; }
       });
       loadComments();
@@ -304,7 +330,7 @@
       const featured = posts.find(post => post.id === settings.featured);
       return `<div class="about-page"><header class="about-header">
         <p class="about-label">关于本站</p><h1>你好，我是 ${escapeHtml(settings.author)}</h1>
-        <p class="lede">${escapeHtml(settings.description)}</p>
+        <p class="lede">我喜欢把平时遇到的小麻烦做成工具。这里记下我是怎么做的，也聊聊把 AI 用进开发之后，哪些地方真的省了时间。</p>
         ${settings.github ? `<a class="secondary" href="${escapeHtml(settings.github)}">访问 GitHub <span aria-hidden="true">↗</span></a>` : ''}
         </header><div class="about-grid">
         ${settings.about.trim() ? `<section class="reading about-story" aria-labelledby="about-story"><h2 id="about-story">我在这里写什么</h2>${renderMarkdown(markdownBlocks(settings.about))}</section>` : ''}
@@ -393,6 +419,9 @@
       query.removeAttribute('aria-activedescendant');
       searchCount.textContent = terms.length ? `${matches.length} 条匹配` : '最近文章';
       results.innerHTML = matches.map((item, index) => `<div role="option" aria-selected="false" id="search-result-${index}" data-result="${index}"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.label)}</small></div>`).join('');
+      results.hidden = !matches.length;
+      results.scrollTop = 0;
+      query.setAttribute('aria-expanded', String(matches.length > 0));
       const empty = dialog.querySelector('.search-empty');
       if (empty) empty.remove();
       if (!matches.length) results.insertAdjacentHTML('afterend','<div class="search-empty"><p>没有找到匹配的文章、笔记或项目。</p><button type="button" class="secondary" id="reset-search">清空搜索</button></div>');
@@ -407,7 +436,9 @@
 
     function updateThemeButton() {
       const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && systemTheme.matches);
-      theme.textContent = dark ? '☀' : '☾';
+      theme.innerHTML = dark
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M19 5l-1.5 1.5m-11 11L5 19"/></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14a8.5 8.5 0 0 1-10.5-10.5A8.5 8.5 0 1 0 20.5 14Z"/></svg>';
       theme.setAttribute('aria-label', dark ? '切换浅色模式' : '切换深色模式');
       theme.title = theme.getAttribute('aria-label');
     }

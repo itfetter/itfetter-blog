@@ -122,27 +122,29 @@
 
   function contentList() {
     const label = labels[view];
+    const statuses = [['','全部'],['published','已发布'],['draft','草稿']];
+    if (view === 'posts') statuses.push(['revision','有草稿']);
     page.innerHTML = `<div class="admin-page-head"><div><h2>${label}</h2><p>管理已发布内容和草稿。</p></div><button type="button" class="primary" id="new-item">新建${label}</button></div>
-      <div class="admin-list"><div class="admin-filters"><label><span>搜索${label}</span><input type="search" id="item-query" placeholder="按标题查找"></label>
-      <label><span>发布状态</span><select id="item-status"><option value="">全部</option><option value="published">已发布</option><option value="draft">草稿</option>${view === 'posts' ? '<option value="revision">有草稿</option>' : ''}</select></label><p class="admin-action-status" id="list-result" role="status"></p><p class="subtle" id="item-count" role="status"></p></div><div id="item-rows"></div></div>`;
+      <div class="admin-list"><div class="admin-filters"><label class="admin-query"><span>搜索${label}</span><input type="search" id="item-query" placeholder="输入标题关键词"></label>
+      <fieldset id="item-status"><legend>发布状态</legend><div>${statuses.map(([value,name]) => `<label><input type="radio" name="item-status" value="${value}"${value === (listFilters[view]?.status || '') ? ' checked' : ''}><span>${name}</span></label>`).join('')}</div></fieldset><p class="admin-action-status" id="list-result" role="status"></p><p class="subtle" id="item-count" role="status"></p></div><div id="item-rows"></div></div>`;
     const query = page.querySelector('#item-query');
     const state = page.querySelector('#item-status');
     const rows = page.querySelector('#item-rows');
     const result = page.querySelector('#list-result');
     if (listFilters[view]) {
       query.value = listFilters[view].query;
-      state.value = listFilters[view].status;
     }
     function articleMetrics(id) {
       const engagement = data.engagement?.[id];
       return `<small class="admin-article-stats"><span>浏览 ${engagement?.views ?? 0}</span><span>评论 ${data.comments?.[id]?.length ?? 0}</span><span>点赞 ${engagement?.likes.length ?? 0}</span></small>`;
     }
     function refresh() {
-      listFilters[view] = {query:query.value,status:state.value};
+      const filter = state.querySelector(':checked').value;
+      listFilters[view] = {query:query.value,status:filter};
       const keyword = query.value.trim().toLowerCase();
-      const visible = data[view].filter(item => (!state.value || item.status === state.value || (state.value === 'revision' && item.draft)) && [item.title,item.draft?.title].some(title => title?.toLowerCase().includes(keyword)));
+      const visible = data[view].filter(item => (!filter || item.status === filter || (filter === 'revision' && item.draft)) && [item.title,item.draft?.title].some(title => title?.toLowerCase().includes(keyword)));
       page.querySelector('#item-count').textContent = `共 ${visible.length} 条`;
-      rows.innerHTML = visible.length ? `<ul>${[...visible].sort((a,b) => (b.date || '').localeCompare(a.date || '')).map(item => `<li><div><strong class="admin-item-title">${escape(item.title)}</strong><small>${escape(item.date || item.kind || '')}${item.topic ? ` · ${escape(data.topics[item.topic])}` : ''}</small>${view === 'posts' ? articleMetrics(item.id) : ''}</div><div class="admin-states"><span class="admin-state ${item.status}">${item.status === 'published' ? '已发布' : '草稿'}</span>${item.draft ? '<span class="admin-state">有草稿</span>' : ''}</div><div class="admin-row-actions"><button type="button" data-edit="${item.id}" aria-label="编辑 ${escape(item.title)}">编辑</button>${view === 'posts' && item.status === 'published' ? `<a href="/#post/${item.id}" target="_blank" rel="noopener">查看</a>` : ''}<button type="button" data-delete="${item.id}" aria-label="删除 ${escape(item.title)}">删除</button></div></li>`).join('')}</ul>` : `<div class="admin-empty"><p>${query.value || state.value ? '没有符合条件的内容。' : `还没有${label}。`}</p>${query.value || state.value ? '<button type="button" class="secondary" id="reset-items">清除筛选</button>' : ''}</div>`;
+      rows.innerHTML = visible.length ? `<ul>${[...visible].sort((a,b) => (b.date || '').localeCompare(a.date || '')).map(item => `<li><div><strong class="admin-item-title">${escape(item.title)}</strong><small>${escape(item.date || item.kind || '')}${item.topic ? ` · ${escape(data.topics[item.topic])}` : ''}</small>${view === 'posts' ? articleMetrics(item.id) : ''}</div><div class="admin-states"><span class="admin-state ${item.status}">${item.status === 'published' ? '已发布' : '草稿'}</span>${item.draft ? '<span class="admin-state">有草稿</span>' : ''}</div><div class="admin-row-actions"><button type="button" data-edit="${item.id}" aria-label="编辑 ${escape(item.title)}">编辑</button>${view === 'posts' && item.status === 'published' ? `<a href="/#post/${item.id}" target="_blank" rel="noopener">查看</a>` : ''}<button type="button" data-delete="${item.id}" aria-label="删除 ${escape(item.title)}">删除</button></div></li>`).join('')}</ul>` : `<div class="admin-empty"><p>${query.value || filter ? '没有符合条件的内容。' : `还没有${label}。`}</p>${query.value || filter ? '<button type="button" class="secondary" id="reset-items">清除筛选</button>' : ''}</div>`;
     }
     query.addEventListener('input',refresh);
     state.addEventListener('change',refresh);
@@ -152,7 +154,7 @@
       if (!button || busy) return;
       if (button.id === 'reset-items') {
         query.value = '';
-        state.value = '';
+        state.querySelector('input[value=""]').checked = true;
         query.focus();
         refresh();
       } else if (button.dataset.edit) openEditor(data[view].find(item => item.id === button.dataset.edit));
