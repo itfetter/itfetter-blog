@@ -729,11 +729,11 @@
       selection.addRange(range);
     }
 
-    function placeCursor(node, atStart = true) {
+    function placeCursor(node, atStart = true, preventScroll = false) {
       const range = document.createRange();
       range.selectNodeContents(node);
       range.collapse(atStart);
-      documentEditor.focus();
+      documentEditor.focus({preventScroll});
       selectRange(range);
       trackSelection();
     }
@@ -945,6 +945,20 @@
       hoverOpened = false;
       menu.open = false;
       if (!block) return;
+      const action = button.dataset.action;
+      if (action === 'remove') {
+        const parent = block.parentElement;
+        const container = parent === documentEditor ? block : parent;
+        const next = block.nextElementSibling || container.nextElementSibling;
+        const previous = block.previousElementSibling || container.previousElementSibling;
+        block.remove();
+        if (parent !== documentEditor && !parent.children.length) parent.remove();
+        if (!documentEditor.children.length) documentEditor.innerHTML = '<p><br></p>';
+        const neighbor = next || previous || documentEditor.firstElementChild;
+        const cells = neighbor.querySelectorAll('th,td');
+        placeCursor((next ? cells[0] : cells[cells.length - 1]) || neighbor, !previous || Boolean(next), true);
+        return;
+      }
       const range = activeRange?.cloneRange() || document.createRange();
       if (!block.contains(range.startContainer) || (!button.dataset.command && !block.contains(range.endContainer))) {
         range.selectNodeContents(block);
@@ -952,7 +966,6 @@
       }
       documentEditor.focus();
       selectRange(range);
-      const action = button.dataset.action;
       if (action === 'add' && block) {
         const after = block.localName === 'li' ? block.parentElement : block;
         const paragraph = document.createElement('p');
@@ -965,15 +978,6 @@
         if (action === 'up') block.previousElementSibling.before(block);
         else block.nextElementSibling.after(block);
         placeCursor(block);
-        return;
-      }
-      if (action === 'remove') {
-        const neighbor = block.nextElementSibling || block.previousElementSibling;
-        const parent = block.parentElement;
-        block.remove();
-        if (parent !== documentEditor && !parent.children.length) parent.remove();
-        if (!documentEditor.children.length) documentEditor.innerHTML = '<p><br></p>';
-        placeCursor(neighbor || documentEditor.firstElementChild);
         return;
       }
 
@@ -1114,9 +1118,13 @@
           menuOptions.querySelector('[data-type=table]').focus();
           return;
         }
-        if (button.dataset.action === 'remove' && block?.textContent.trim() &&
-            !await confirmAction('删除正文块？','可以在编辑器中撤销这次删除。','删除正文块',true)) return;
-        applyEdit(() => changeBlock(button,block));
+        if (button.dataset.action === 'remove') {
+          const top = window.scrollY;
+          if (block?.textContent.trim() &&
+              !await confirmAction('删除正文块？','可以在编辑器中撤销这次删除。','删除正文块',true)) return;
+          applyEdit(() => changeBlock(button,block));
+          window.scrollTo({top,behavior:'instant'});
+        } else applyEdit(() => changeBlock(button,block));
       } else if ('colorToggle' in button.dataset) {
         showColorPalette(colorPalette.hidden);
         if (!colorPalette.hidden && event.detail === 0) colorPalette.querySelector('button').focus();
