@@ -223,7 +223,7 @@
     const editorFields = isPost ? `<div class="document-header">${input('title','文章标题',item.title,150)}<details class="publication-settings"><summary>发布设置</summary><div class="admin-fields">${fields}</div>${textarea('summary','文章摘要',item.summary,350,false)}<div class="admin-fields">${input('cover','封面图片地址',item.cover,500,'text',false)}${input('coverAlt','封面替代文字',item.coverAlt,150,'text',false)}</div><div class="admin-export"><button type="button" class="secondary" data-cover-upload>上传封面</button><input type="file" accept="${imageFormats}" hidden data-cover-file><span class="admin-action-status" role="status" data-cover-status></span></div></details></div><div class="editor-cover">${coverImage(item,true)}</div><section id="article-editor"></section>` : `${input('title','标题',item.title,150)}<div class="admin-fields">${fields}</div>${details}`;
     const actions = isPost ? `<a class="secondary" data-live-post target="_blank" rel="noopener" hidden>查看前台</a><button type="submit" class="secondary" name="status" value="draft">保存草稿</button><button type="submit" class="primary" name="status" value="published"></button>` : `<button type="submit" class="primary">保存${labels[collection]}</button>`;
     const initial = isPost ? (entry.draft || entry.status === 'draft' ? '草稿已保存。' : '编辑后会自动保存草稿。') : '';
-    page.innerHTML = `<div class="admin-page-head"><div><button type="button" class="admin-back" id="return-list">← 返回${labels[collection]}列表</button><h2>${itemId ? '编辑' : '新建'}${labels[collection]}</h2></div>${isPost ? '<button type="button" class="secondary" id="withdraw-post" hidden>撤回发布</button>' : ''}</div>
+    page.innerHTML = `<div class="admin-editor-nav"><button type="button" class="admin-back" id="return-list">← 返回${labels[collection]}列表</button></div><div class="admin-page-head"><h2>${itemId ? '编辑' : '新建'}${labels[collection]}</h2>${isPost ? '<button type="button" class="secondary" id="withdraw-post" hidden>撤回发布</button>' : ''}</div>
       <form id="content-form" class="admin-editor"><div class="admin-card ${isPost ? 'document-card' : ''}">${editorFields}</div>${saveBar(actions,initial)}</form>`;
     const form = page.querySelector('#content-form');
     const feedback = form.querySelector('[data-save-status]');
@@ -323,7 +323,13 @@
       const settings = event.target.closest('.publication-settings');
       if (settings) settings.open = true;
     },true);
-    page.querySelector('#return-list').addEventListener('click', () => switchView(collection));
+    page.querySelector('#return-list').addEventListener('click', async () => {
+      if (!await switchView(collection)) return;
+      window.scrollTo({top:0,behavior:'instant'});
+      const heading = page.querySelector('.admin-page-head h2');
+      heading.tabIndex = -1;
+      heading.focus({preventScroll:true});
+    });
     withdraw?.addEventListener('click', async () => {
       if (manualPending) return;
       manualPending = true;
@@ -458,7 +464,7 @@
 
   function articleEditor(root, item, onEdit) {
     const {signal} = (editorEvents = new AbortController());
-    const adminHeader = document.querySelector('.header');
+    const editorNav = page.querySelector('.admin-editor-nav');
     let markdown = item.body || '';
     let mode = 'document';
     let activeRange = null;
@@ -497,7 +503,7 @@
 
     function positionBlockOptions() {
       const handle = menu.querySelector('summary').getBoundingClientRect();
-      const topEdge = adminHeader.getBoundingClientRect().bottom + 8;
+      const topEdge = editorNav.getBoundingClientRect().bottom + 8;
       const bottomEdge = window.innerHeight - 8;
       const rightEdge = document.documentElement.clientWidth - 8;
       if (handle.bottom <= topEdge || handle.top >= bottomEdge) {
@@ -530,7 +536,7 @@
       if (!show) return;
       const bounds = trigger.getBoundingClientRect();
       const {width,height} = colorPalette.getBoundingClientRect();
-      const topEdge = adminHeader.getBoundingClientRect().bottom + 8;
+      const topEdge = editorNav.getBoundingClientRect().bottom + 8;
       const bottomEdge = window.innerHeight - 8;
       const below = bounds.bottom + 9;
       const above = bounds.top - height - 9;
@@ -548,7 +554,7 @@
       const block = blockAt(activeRange.startContainer);
       const endBlock = blockAt(activeRange.endContainer);
       const rangeBounds = activeRange.getBoundingClientRect();
-      const topEdge = adminHeader.getBoundingClientRect().bottom + 8;
+      const topEdge = editorNav.getBoundingClientRect().bottom + 8;
       if (block?.closest('pre') || endBlock?.closest('pre') || !rangeBounds.width ||
           rangeBounds.bottom < topEdge || rangeBounds.top >= window.innerHeight) {
         selectionToolbar.hidden = true;
@@ -687,7 +693,7 @@
     function positionTableMenu() {
       const anchor = tableTarget.getBoundingClientRect();
       const rect = tableMenu.getBoundingClientRect();
-      const topEdge = adminHeader.getBoundingClientRect().bottom + 8;
+      const topEdge = editorNav.getBoundingClientRect().bottom + 8;
       const bottomEdge = window.innerHeight - 8;
       if (anchor.bottom < topEdge || anchor.top > bottomEdge) {
         closeTableMenu();
